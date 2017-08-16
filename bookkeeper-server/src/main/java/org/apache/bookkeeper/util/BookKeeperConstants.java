@@ -28,9 +28,10 @@ public class BookKeeperConstants {
     public static final String LEDGER_NODE_PREFIX = "L";
     public static final String COLON = ":";
     public static final String VERSION_FILENAME = "VERSION";
-    public final static String PASSWD = "passwd";
+    public static final String PASSWD = "passwd";
     public static final String CURRENT_DIR = "current";
     public static final String READONLY = "readonly";
+    public static final long INVALID_LEDGER_ID = -1L;
     
     // //////////////////////////
     // ///// Znodes//////////////

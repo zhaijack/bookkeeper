@@ -17,15 +17,12 @@
  */
 package org.apache.bookkeeper.client;
 
+import static com.google.common.base.Charsets.UTF_8;
+
+import com.google.common.base.Optional;
+import com.google.common.collect.Maps;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.TextFormat;
-
-import org.apache.bookkeeper.net.BookieSocketAddress;
-import org.apache.bookkeeper.proto.DataFormats.LedgerMetadataFormat;
-import org.apache.bookkeeper.versioning.Version;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
@@ -38,11 +35,11 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.SortedMap;
 import java.util.TreeMap;
-
-import static com.google.common.base.Charsets.UTF_8;
-
-import com.google.common.base.Optional;
-import com.google.common.collect.Maps;
+import org.apache.bookkeeper.net.BookieSocketAddress;
+import org.apache.bookkeeper.proto.DataFormats.LedgerMetadataFormat;
+import org.apache.bookkeeper.versioning.Version;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This class encapsulates all the ledger metadata that is persistently stored
@@ -289,6 +286,18 @@ public class LedgerMetadata {
         if (metadataFormatVersion == 1) {
             return serializeVersion1();
         }
+        LedgerMetadataFormat format = toProtoFormat();
+
+        StringBuilder s = new StringBuilder();
+        s.append(VERSION_KEY).append(tSplitter).append(CURRENT_METADATA_FORMAT_VERSION).append(lSplitter);
+        s.append(TextFormat.printToString(format));
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Serialized config: {}", s);
+        }
+        return s.toString().getBytes(UTF_8);
+    }
+
+    public LedgerMetadataFormat toProtoFormat() {
         LedgerMetadataFormat.Builder builder = LedgerMetadataFormat.newBuilder();
         builder.setQuorumSize(writeQuorumSize).setAckQuorumSize(ackQuorumSize)
             .setEnsembleSize(ensembleSize).setLength(length)
@@ -315,13 +324,7 @@ public class LedgerMetadata {
             builder.addSegment(segmentBuilder.build());
         }
 
-        StringBuilder s = new StringBuilder();
-        s.append(VERSION_KEY).append(tSplitter).append(CURRENT_METADATA_FORMAT_VERSION).append(lSplitter);
-        s.append(TextFormat.printToString(builder.build()));
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Serialized config: {}", s);
-        }
-        return s.toString().getBytes(UTF_8);
+        return builder.build();
     }
 
     private byte[] serializeVersion1() {
@@ -411,6 +414,25 @@ public class LedgerMetadata {
 
         TextFormat.merge((CharSequence) CharBuffer.wrap(configBuffer), builder);
         LedgerMetadataFormat data = builder.build();
+        applyLedgerMetadataFormat(lc, data, msCtime);
+        return lc;
+    }
+
+    public static LedgerMetadata fromLedgerMetadataFormat(LedgerMetadataFormat format,
+                                                          Version version,
+                                                          Optional<Long> msCtime)
+            throws IOException {
+        LedgerMetadata lc = new LedgerMetadata();
+        lc.version = version;
+        lc.metadataFormatVersion = CURRENT_METADATA_FORMAT_VERSION;
+        applyLedgerMetadataFormat(lc, format, msCtime);
+        return lc;
+    }
+
+    private static void applyLedgerMetadataFormat(LedgerMetadata lc,
+                                                  LedgerMetadataFormat data,
+                                                  Optional<Long> msCtime)
+            throws IOException {
         lc.writeQuorumSize = data.getQuorumSize();
         if (data.hasCtime()) {
             lc.ctime = data.getCtime();
@@ -449,7 +471,6 @@ public class LedgerMetadata {
                 lc.customMetadata.put(ent.getKey(), ent.getValue().toByteArray());
             }
         }
-        return lc;
     }
 
     static LedgerMetadata parseVersion1Config(LedgerMetadata lc,

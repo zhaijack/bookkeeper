@@ -25,14 +25,19 @@ import java.net.MalformedURLException;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.bookkeeper.bookie.Bookie;
 import org.apache.bookkeeper.bookie.ExitCode;
 import org.apache.bookkeeper.common.component.ComponentStarter;
 import org.apache.bookkeeper.common.component.LifecycleComponent;
 import org.apache.bookkeeper.common.component.LifecycleComponentStack;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.http.BKServiceProvider;
+import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.server.conf.BookieConfiguration;
+import org.apache.bookkeeper.server.conf.RpcConfiguration;
+import org.apache.bookkeeper.server.rpc.BookieRpcServerSpec;
 import org.apache.bookkeeper.server.service.AutoRecoveryService;
+import org.apache.bookkeeper.server.service.BookieRpcService;
 import org.apache.bookkeeper.server.service.BookieService;
 import org.apache.bookkeeper.server.service.HttpService;
 import org.apache.bookkeeper.server.service.StatsProviderService;
@@ -278,13 +283,16 @@ public class Main {
 
             serverBuilder.addComponent(statsProviderService);
 
-            // 2. build bookie server
+            // 2. create the server resources
+            ServerResources serverResources = ServerResources.create(rootStatsLogger);
+
+            // 3. build bookie server
             BookieService bookieService =
                 new BookieService(conf, rootStatsLogger);
 
             serverBuilder.addComponent(bookieService);
 
-            // 3. build auto recovery
+            // 4. build auto recovery
             if (conf.getServerConf().isAutoRecoveryDaemonEnabled()) {
                 AutoRecoveryService autoRecoveryService =
                     new AutoRecoveryService(conf, rootStatsLogger.scope(REPLICATION_SCOPE));
@@ -292,7 +300,7 @@ public class Main {
                 serverBuilder.addComponent(autoRecoveryService);
             }
 
-            // 4. build http service
+            // 5. build http service
             if (conf.getServerConf().isHttpServerEnabled()) {
                 BKServiceProvider provider = new BKServiceProvider.Builder()
                     .setBookieServer(bookieService.getServer())
@@ -302,6 +310,31 @@ public class Main {
                     new HttpService(provider, conf, rootStatsLogger);
 
                 serverBuilder.addComponent(httpService);
+            }
+
+            // 6. build the rpc service
+            if (conf.getServerConf().isRpcServerEnabled()) {
+                int rpcPort = conf.getServerConf().getRpcServerPort();
+                BookieSocketAddress bookieAddr = Bookie.getBookieAddress(conf.getServerConf());
+                BookieSocketAddress rpcAddr = new BookieSocketAddress(
+                    bookieAddr.getHostName(),
+                    rpcPort);
+                RpcConfiguration rpcConf = new RpcConfiguration(conf.getServerConf());
+                StatsLogger rpcStatsLogger = rootStatsLogger.scope("rpc");
+                BookieRpcServerSpec spec = BookieRpcServerSpec.newBuilder()
+                    .bookieSupplier(() -> bookieService.getServer().getBookie())
+                    .rpcConf(rpcConf)
+                    .endpoint(rpcAddr)
+                    .statsLogger(rpcStatsLogger)
+                    .schedulerResource(serverResources.scheduler())
+                    .build();
+
+                BookieRpcService rpcService = new BookieRpcService(
+                    rpcConf,
+                    spec,
+                    rpcStatsLogger);
+
+                serverBuilder.addComponent(rpcService);
             }
         } catch (Exception e) {
             LifecycleComponent component = serverBuilder.build();
