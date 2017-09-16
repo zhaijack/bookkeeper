@@ -18,10 +18,29 @@
 
 package org.apache.bookkeeper.client.utils;
 
+import static org.apache.bookkeeper.common.concurrent.FutureUtils.fromListenableFuture;
+
+import com.google.common.util.concurrent.ListenableFuture;
 import io.grpc.CallCredentials;
 import io.grpc.Metadata;
+import io.grpc.Status;
+import io.grpc.StatusException;
+import io.grpc.StatusRuntimeException;
 import io.grpc.stub.AbstractStub;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
+import org.apache.bookkeeper.client.LedgerMetadata;
+import org.apache.bookkeeper.common.util.Backoff;
+import org.apache.bookkeeper.common.util.OrderedScheduler;
+import org.apache.bookkeeper.common.util.Retries;
+import org.apache.bookkeeper.proto.rpc.metadata.GetLedgerRangesRequest;
+import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataRequest;
+import org.apache.bookkeeper.versioning.LongVersion;
+import org.apache.bookkeeper.versioning.Version;
 
 /**
  * RPC utility functions
@@ -29,6 +48,16 @@ import java.util.Optional;
 public final class RpcUtils {
 
     private static final String TOKEN = "token";
+
+    // backoff parameters
+
+    public static final int DEFAULT_BACKOFF_START_MS = 200;
+    public static final int DEFAULT_BACKOFF_MAX_MS = 1000;
+    public static final int DEFAULT_BACKOFF_MULTIPLIER = 2;
+
+    // default retry predicate
+    private static final Predicate<Throwable> DEFAULT_RPC_RETRY_PREDICATE =
+        cause -> shouldRetryOnRpcException(cause);
 
     private RpcUtils() {}
 
@@ -42,6 +71,103 @@ public final class RpcUtils {
             };
             return stub.withCallCredentials(callCredentials);
         }).orElse(stub);
+    }
+
+    public static Stream<Long> defaultBackoffs() {
+        return Backoff.exponential(
+            DEFAULT_BACKOFF_START_MS,
+            DEFAULT_BACKOFF_MULTIPLIER,
+            DEFAULT_BACKOFF_MAX_MS);
+    }
+
+    public static Predicate<Throwable> defaultRpcRetryPredicate() {
+        return DEFAULT_RPC_RETRY_PREDICATE;
+    }
+
+    public static LedgerMetadataRequest createLedgerMetadataRequest(long ledgerId,
+                                                                    LedgerMetadata metadata) {
+        return LedgerMetadataRequest.newBuilder()
+            .setLedgerId(ledgerId)
+            .setMetadata(metadata.toProtoFormat())
+            .build();
+    }
+
+    public static LedgerMetadataRequest removeLedgerMetadataRequest(long ledgerId,
+                                                                    Version version) {
+        return LedgerMetadataRequest.newBuilder()
+            .setLedgerId(ledgerId)
+            .setExpectedVersion(((LongVersion) version).getLongVersion())
+            .build();
+    }
+
+    public static LedgerMetadataRequest readLedgerMetadataRequest(long ledgerId) {
+        return LedgerMetadataRequest.newBuilder().setLedgerId(ledgerId).build();
+    }
+
+    public static LedgerMetadataRequest writeLedgerMetadataRequest(long ledgerId, LedgerMetadata metadata) {
+        return LedgerMetadataRequest.newBuilder()
+            .setLedgerId(ledgerId)
+            .setMetadata(metadata.toProtoFormat())
+            .setExpectedVersion(((LongVersion) metadata.getVersion()).getLongVersion())
+            .buildPartial();
+    }
+
+    public static LedgerMetadataRequest watchLedgerMetadataRequest(long ledgerId) {
+        return LedgerMetadataRequest.newBuilder().setLedgerId(ledgerId).build();
+    }
+
+    public static GetLedgerRangesRequest getLedgerRangesRequest(int limit) {
+        return GetLedgerRangesRequest.newBuilder()
+            .setLimitPerResponse(limit)
+            .build();
+    }
+
+    /**
+     * Check if we should retry on a RPC exception <i>cause</i>.
+     *
+     * @param cause the rpc exception
+     * @return true if we should retry on a RPC exception, otherwise false.
+     */
+    public static boolean shouldRetryOnRpcException(Throwable cause) {
+        if (cause instanceof StatusRuntimeException || cause instanceof StatusException) {
+            Status rpcStatus;
+            if (cause instanceof StatusRuntimeException) {
+                rpcStatus = ((StatusRuntimeException) cause).getStatus();
+            } else {
+                rpcStatus = ((StatusException) cause).getStatus();
+            }
+            switch (rpcStatus.getCode()) {
+                case INVALID_ARGUMENT:
+                case NOT_FOUND:
+                case ALREADY_EXISTS:
+                case PERMISSION_DENIED:
+                case UNAUTHENTICATED:
+                    return false;
+                default:
+                    return true;
+            }
+        } else if (cause instanceof RuntimeException) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
+     * Execute an operation with the default backoffs and default retry predicate.
+     *
+     * @param opSupplier the supplier that supplies operation to run
+     * @param scheduler scheduler to execute the callback
+     * @param maxNumRetries max num of retries
+     */
+    public static <T> CompletableFuture<T> retry(Supplier<ListenableFuture<T>> opSupplier,
+                                                 OrderedScheduler scheduler,
+                                                 int maxNumRetries) {
+        return Retries.run(
+            defaultBackoffs().limit(maxNumRetries),
+            defaultRpcRetryPredicate(),
+            () -> fromListenableFuture(opSupplier.get(), Function.identity()),
+            scheduler);
     }
 
 }

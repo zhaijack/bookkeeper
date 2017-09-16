@@ -1644,6 +1644,9 @@ public class ClientConfiguration extends AbstractConfiguration {
      */
     public List<BookieSocketAddress> getClientBootstrapBookies() {
         List bootstrapBookieNames = getList(BOOTSTRAP_BOOKIES, null);
+        if (null == bootstrapBookieNames) {
+            return null;
+        }
         return Lists.transform(
             bootstrapBookieNames,
             bookieName -> {

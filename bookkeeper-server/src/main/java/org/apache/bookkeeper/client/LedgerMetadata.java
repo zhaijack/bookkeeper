@@ -549,7 +549,7 @@ public class LedgerMetadata {
      *          The second map to compare with
      * @return true if the 2 maps contain the exact set of <K,V> pairs.
      */
-    public static boolean areByteArrayValMapsEqual(Map<String, byte[]> first, Map<String, byte[]> second) {
+    static boolean areByteArrayValMapsEqual(Map<String, byte[]> first, Map<String, byte[]> second) {
         if(first == null && second == null) {
             return true;
         }

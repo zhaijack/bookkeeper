@@ -26,9 +26,6 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.util.Optional;
-import javax.annotation.Nullable;
-import org.apache.bookkeeper.client.BKException;
-import org.apache.bookkeeper.client.BKException.Code;
 import org.apache.bookkeeper.client.LedgerMetadata;
 import org.apache.bookkeeper.client.resolver.SimpleNameResolverFactory;
 import org.apache.bookkeeper.client.utils.RpcUtils;
@@ -38,17 +35,14 @@ import org.apache.bookkeeper.meta.LedgerIdGenerator;
 import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.meta.LedgerManagerFactory;
 import org.apache.bookkeeper.meta.LedgerUnderreplicationManager;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.LedgerMetadataListener;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.Processor;
-import org.apache.bookkeeper.proto.rpc.common.StatusCode;
-import org.apache.bookkeeper.proto.rpc.metadata.LedgerIdAllocateRequest;
-import org.apache.bookkeeper.proto.rpc.metadata.LedgerIdAllocateResponse;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataRequest;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataResponse;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc.LedgerMetadataServiceFutureStub;
+import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc.LedgerMetadataServiceStub;
 import org.apache.bookkeeper.replication.ReplicationException.CompatibilityException;
 import org.apache.bookkeeper.versioning.Version;
 import org.apache.zookeeper.AsyncCallback.VoidCallback;
@@ -64,7 +58,8 @@ public class RpcLedgerManagerFactory extends LedgerManagerFactory {
     // variables initialized by {@link #initialize()}
     ClientConfiguration conf;
     ManagedChannel channel;
-    LedgerMetadataServiceFutureStub lmService;
+    LedgerMetadataServiceStub lmService;
+    LedgerMetadataServiceFutureStub lmFutureService;
 
     RpcLedgerManagerFactory() {
         this(Optional.empty());
@@ -100,6 +95,9 @@ public class RpcLedgerManagerFactory extends LedgerManagerFactory {
 
         // configure the ledger metadata rpc service
         this.lmService = RpcUtils.configureRpcStub(
+            LedgerMetadataServiceGrpc.newStub(channel),
+            Optional.empty());
+        this.lmFutureService = RpcUtils.configureRpcStub(
             LedgerMetadataServiceGrpc.newFutureStub(channel),
             Optional.empty());
         return this;
@@ -114,12 +112,12 @@ public class RpcLedgerManagerFactory extends LedgerManagerFactory {
 
     @Override
     public LedgerIdGenerator newLedgerIdGenerator() {
-        return new RpcLedgerIdGenerator(lmService);
+        return new RpcLedgerIdGenerator(lmFutureService);
     }
 
     @Override
     public LedgerManager newLedgerManager() {
-        return null;
+        return new RpcLedgerManager(lmService, lmFutureService, );
     }
 
     @Override
@@ -128,118 +126,4 @@ public class RpcLedgerManagerFactory extends LedgerManagerFactory {
         throw new UnsupportedOperationException("Ledger Underreplicated Manager is not supported yet");
     }
 
-    private static class RpcLedgerIdGenerator implements LedgerIdGenerator {
-
-        private static final LedgerIdAllocateRequest ALLOCATE_REQUEST = LedgerIdAllocateRequest.newBuilder().build();
-
-        private final LedgerMetadataServiceFutureStub lmService;
-
-        RpcLedgerIdGenerator(LedgerMetadataServiceFutureStub lmService) {
-            this.lmService = lmService;
-        }
-
-        @Override
-        public void generateLedgerId(GenericCallback<Long> cb) {
-            Futures.addCallback(
-                lmService.allocate(ALLOCATE_REQUEST),
-                new FutureCallback<LedgerIdAllocateResponse>() {
-
-                    @Override
-                    public void onSuccess(LedgerIdAllocateResponse resp) {
-                        if (StatusCode.SUCCESS == resp.getCode()) {
-                            cb.operationComplete(Code.OK, resp.getLedgerId());
-                        } else {
-                            cb.operationComplete(Code.MetaStoreException, null);
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(Throwable cause) {
-                        cb.operationComplete(Code.MetaStoreException, null);
-                    }
-                });
-        }
-
-        @Override
-        public void close() throws IOException {
-            // no-op
-        }
-    }
-
-    private static class RpcLedgerManager implements LedgerManager {
-
-        private final LedgerMetadataServiceFutureStub lmService;
-
-        RpcLedgerManager(LedgerMetadataServiceFutureStub lmService) {
-            this.lmService = lmService;
-        }
-
-        @Override
-        public void createLedgerMetadata(long ledgerId, LedgerMetadata metadata, GenericCallback<Void> cb) {
-            LedgerMetadataRequest request = LedgerMetadataRequest.newBuilder()
-                .setLedgerId(ledgerId)
-                .setExpectedVersion(-1L)
-                .setMetadata(metadata.toProtoFormat())
-                .build();
-
-            Futures.addCallback(
-                lmService.create(request),
-                new FutureCallback<LedgerMetadataResponse>() {
-                    @Override
-                    public void onSuccess(LedgerMetadataResponse ledgerMetadataResponse) {
-
-                    }
-
-                    @Override
-                    public void onFailure(Throwable throwable) {
-
-                    }
-                }
-            );
-        }
-
-        @Override
-        public void removeLedgerMetadata(long ledgerId, Version version, GenericCallback<Void> vb) {
-
-        }
-
-        @Override
-        public void readLedgerMetadata(long ledgerId, GenericCallback<LedgerMetadata> readCb) {
-
-        }
-
-        @Override
-        public void writeLedgerMetadata(long ledgerId, LedgerMetadata metadata, GenericCallback<Void> cb) {
-
-        }
-
-        @Override
-        public void registerLedgerMetadataListener(long ledgerId, LedgerMetadataListener listener) {
-
-        }
-
-        @Override
-        public void unregisterLedgerMetadataListener(long ledgerId, LedgerMetadataListener listener) {
-
-        }
-
-        @Override
-        public void asyncProcessLedgers(Processor<Long> processor,
-                                        VoidCallback finalCb,
-                                        Object context,
-                                        int successRc,
-                                        int failureRc) {
-
-        }
-
-        @Override
-        public LedgerRangeIterator getLedgerRanges() {
-            return null;
-        }
-
-        @Override
-        public void close() throws IOException {
-            // no-op
-        }
-    }
 }
