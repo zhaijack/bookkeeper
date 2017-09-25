@@ -19,6 +19,7 @@
 package org.apache.bookkeeper.client.meta;
 
 import static org.apache.bookkeeper.client.utils.RpcUtils.createLedgerMetadataRequest;
+import static org.apache.bookkeeper.client.utils.RpcUtils.getLedgerRangesRequest;
 import static org.apache.bookkeeper.client.utils.RpcUtils.readLedgerMetadataRequest;
 import static org.apache.bookkeeper.client.utils.RpcUtils.removeLedgerMetadataRequest;
 import static org.apache.bookkeeper.client.utils.RpcUtils.writeLedgerMetadataRequest;
@@ -26,9 +27,13 @@ import static org.apache.bookkeeper.client.utils.RpcUtils.writeLedgerMetadataReq
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
+import com.google.protobuf.ByteString;
+import io.grpc.stub.StreamObserver;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.TreeSet;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.BKException.Code;
 import org.apache.bookkeeper.client.LedgerMetadata;
@@ -40,6 +45,8 @@ import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.LedgerMetadataListener;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.Processor;
+import org.apache.bookkeeper.proto.rpc.metadata.GetLedgerRangesRequest;
+import org.apache.bookkeeper.proto.rpc.metadata.GetLedgerRangesResponse;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataRequest;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataResponse;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc.LedgerMetadataServiceFutureStub;
@@ -264,9 +271,55 @@ class RpcLedgerManager implements LedgerManager {
         throw new UnsupportedOperationException("Iterating ledgers is not supported by RPC yet.");
     }
 
+    private static final int DEFAULT_GET_LEDGER_RANGES_LIMIT = 20;
+
+    private LedgerRange decodeFromByteBuffer(ByteString source, int count) {
+        // TODO: decode ledgers from grpc returned ByteString.
+        return new LedgerRange(new TreeSet<Long>);
+    }
+
     @Override
     public LedgerRangeIterator getLedgerRanges() {
-        throw new UnsupportedOperationException("Iterating ledgers is not supported by RPC yet.");
+        final List<LedgerRange> nextRanges = Lists.newArrayList();
+        GetLedgerRangesRequest request = getLedgerRangesRequest(DEFAULT_GET_LEDGER_RANGES_LIMIT);
+        StreamObserver<GetLedgerRangesResponse> observer = new StreamObserver<GetLedgerRangesResponse>() {
+            LedgerRange nextRange;
+            @Override
+            public void onNext(GetLedgerRangesResponse response) {
+                ByteString encodedBytes = response.getSerializedRanges();
+                nextRange = decodeFromByteBuffer(encodedBytes, response.getCount());
+                nextRanges.add(nextRange);
+            }
+
+            @Override
+            public void onError(Throwable cause) {
+                nextRange = null;
+            }
+
+            @Override
+            public void onCompleted() {
+                nextRange = null;
+            }
+        };
+
+        lmService.iterate(request, observer);
+
+        return new LedgerRangeIterator() {
+            private int nextIndex = 0;
+
+            @Override
+            synchronized public boolean hasNext() throws IOException {
+                return nextRanges.size() > nextIndex;
+            }
+
+            @Override
+            synchronized public LedgerRange next() throws IOException {
+                if (!hasNext()) {
+                    throw new NoSuchElementException();
+                }
+                return nextRanges.get(nextIndex ++);
+            }
+        };
     }
 
     @Override
