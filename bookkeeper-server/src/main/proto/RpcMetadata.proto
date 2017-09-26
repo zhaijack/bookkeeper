@@ -59,12 +59,15 @@ message GetLedgerRangesRequest {
     int32 limit_per_response = 1;
 }
 
+// each response will contains server ledgers and they will consist one LedgerRange
 message GetLedgerRangesResponse {
+    message LedgerRangeFormat {
+        repeated int64 ledger_ids = 1;
+    }
     // status code
     common.StatusCode code              = 1;
-    // count is set to the number of keys returned
-    int32 count                         = 2;
-    bytes serialized_ranges             = 3;
+    // count is set to the number of led returned
+    LedgerRangeFormat ledger_range      = 2;
 }
 
 service LedgerMetadataService {

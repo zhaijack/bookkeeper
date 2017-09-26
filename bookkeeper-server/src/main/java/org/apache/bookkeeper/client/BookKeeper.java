@@ -43,9 +43,6 @@ import org.apache.bookkeeper.client.AsyncCallback.DeleteCallback;
 import org.apache.bookkeeper.client.AsyncCallback.OpenCallback;
 import org.apache.bookkeeper.client.AsyncCallback.IsClosedCallback;
 import org.apache.bookkeeper.client.BookieInfoReader.BookieInfo;
-import org.apache.bookkeeper.common.util.OrderedScheduler;
-import org.apache.bookkeeper.common.util.SharedResourceManager;
-import org.apache.bookkeeper.common.util.SharedResourceManager.Resource;
 import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.feature.Feature;
 import org.apache.bookkeeper.feature.FeatureProvider;
@@ -117,8 +114,7 @@ public class BookKeeper implements AutoCloseable {
     final BookieClient bookieClient;
     final BookieWatcher bookieWatcher;
 
-    final Resource<OrderedScheduler> mainWorkerPoolResource;
-    final OrderedScheduler mainWorkerPool;
+    final OrderedSafeExecutor mainWorkerPool;
     final ScheduledExecutorService scheduler;
     final HashedWheelTimer requestTimer;
     final boolean ownTimer;
@@ -477,8 +473,13 @@ public class BookKeeper implements AutoCloseable {
             this.readLACSpeculativeRequestPolicy = Optional.<SpeculativeRequestExecutionPolicy>absent();
         }
         // initialize main worker pool
-        this.mainWorkerPoolResource = SharedResourceManager.shared().get()
-        this.mainWorkerPool = ;
+        this.mainWorkerPool = OrderedSafeExecutor.newBuilder()
+                .name("BookKeeperClientWorker")
+                .numThreads(conf.getNumWorkerThreads())
+                .statsLogger(statsLogger)
+                .traceTaskExecution(conf.getEnableTaskExecutionStats())
+                .traceTaskWarnTimeMicroSec(conf.getTaskExecutionWarnTimeMicros())
+                .build();
 
         // initialize bookie client
         this.bookieClient = new BookieClient(conf, this.eventLoopGroup, this.mainWorkerPool, statsLogger);

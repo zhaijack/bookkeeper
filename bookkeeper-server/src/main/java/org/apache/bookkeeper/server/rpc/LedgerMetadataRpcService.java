@@ -21,12 +21,12 @@ package org.apache.bookkeeper.server.rpc;
 import static org.apache.bookkeeper.util.BookKeeperConstants.INVALID_LEDGER_ID;
 
 import com.google.common.base.Optional;
-import com.google.protobuf.UnsafeByteOperations;
+import com.google.common.collect.Lists;
 import io.grpc.Status;
 import io.grpc.StatusRuntimeException;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.bookkeeper.client.BKException.Code;
@@ -38,6 +38,7 @@ import org.apache.bookkeeper.proto.DataFormats.LedgerMetadataFormat;
 import org.apache.bookkeeper.proto.rpc.common.StatusCode;
 import org.apache.bookkeeper.proto.rpc.metadata.GetLedgerRangesRequest;
 import org.apache.bookkeeper.proto.rpc.metadata.GetLedgerRangesResponse;
+import org.apache.bookkeeper.proto.rpc.metadata.GetLedgerRangesResponse.LedgerRangeFormat;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerIdAllocateRequest;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerIdAllocateResponse;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataRequest;
@@ -281,13 +282,11 @@ public class LedgerMetadataRpcService extends LedgerMetadataServiceImplBase {
         });
     }
 
-    static void sendGetLedgerRangesResponse(ByteBuffer buf,
+    static void sendGetLedgerRangesResponse(List<Long> buf,
                                             StreamObserver<GetLedgerRangesResponse> respObserver) {
-        int count = buf.limit() / Long.BYTES;
         GetLedgerRangesResponse resp = GetLedgerRangesResponse.newBuilder()
             .setCode(StatusCode.SUCCESS)
-            .setCount(count)
-            .setSerializedRanges(UnsafeByteOperations.unsafeWrap(buf))
+            .setLedgerRange(LedgerRangeFormat.newBuilder().addAllLedgerIds(buf).build())
             .build();
         respObserver.onNext(resp);
     }
@@ -295,37 +294,31 @@ public class LedgerMetadataRpcService extends LedgerMetadataServiceImplBase {
     static void sendGetLedgerRangesErrorResponse(StreamObserver<GetLedgerRangesResponse> respObserver) {
         GetLedgerRangesResponse resp = GetLedgerRangesResponse.newBuilder()
             .setCode(StatusCode.LEDGER_METADATA_ERROR)
-            .setCount(0)
             .build();
         respObserver.onNext(resp);
     }
-
 
     @Override
     public void iterate(GetLedgerRangesRequest request,
                         StreamObserver<GetLedgerRangesResponse> responseObserver) {
         int limit = Math.min(512, request.getLimitPerResponse());
 
-        AtomicReference<ByteBuffer> bufRef = new AtomicReference<>();
-        bufRef.set(ByteBuffer.allocateDirect(limit * Long.BYTES));
+        AtomicReference<List> bufRef = new AtomicReference<>();
+        bufRef.set(Lists.newArrayListWithExpectedSize(limit));
         lm.asyncProcessLedgers(
             (ledgerId, iterCb) -> {
-                ByteBuffer buf = bufRef.get();
-                buf.putLong(ledgerId);
-                if (!buf.hasRemaining()) {
-                    buf.flip();
+                List<Long> buf = bufRef.get();
+                buf.add(ledgerId);
+                if (buf.size() == limit) {
                     sendGetLedgerRangesResponse(buf, responseObserver);
-                    bufRef.set(ByteBuffer.allocateDirect(limit * Long.BYTES));
+                    bufRef.set(Lists.newArrayListWithExpectedSize(limit));
                 }
                 iterCb.processResult(Code.OK, null, null);
             },
             (rc, path, ctx) -> {
                 if (Code.OK == rc) {
-                    ByteBuffer buf = bufRef.get();
-                    buf.flip();
-                    if (buf.hasRemaining()) {
-                        sendGetLedgerRangesResponse(buf, responseObserver);
-                    }
+                    List<Long> buf = bufRef.get();
+                    sendGetLedgerRangesResponse(buf, responseObserver);
                 } else {
                     sendGetLedgerRangesErrorResponse(responseObserver);
                 }

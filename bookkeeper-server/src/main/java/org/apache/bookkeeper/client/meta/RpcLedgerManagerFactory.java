@@ -19,14 +19,12 @@
 package org.apache.bookkeeper.client.meta;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.util.concurrent.FutureCallback;
-import com.google.common.util.concurrent.Futures;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.netty.NettyChannelBuilder;
 import java.io.IOException;
 import java.util.Optional;
-import org.apache.bookkeeper.client.LedgerMetadata;
+import org.apache.bookkeeper.client.ClientResources;
 import org.apache.bookkeeper.client.resolver.SimpleNameResolverFactory;
 import org.apache.bookkeeper.client.utils.RpcUtils;
 import org.apache.bookkeeper.conf.AbstractConfiguration;
@@ -35,17 +33,10 @@ import org.apache.bookkeeper.meta.LedgerIdGenerator;
 import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.meta.LedgerManagerFactory;
 import org.apache.bookkeeper.meta.LedgerUnderreplicationManager;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.LedgerMetadataListener;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.Processor;
-import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataRequest;
-import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataResponse;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc.LedgerMetadataServiceFutureStub;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc.LedgerMetadataServiceStub;
 import org.apache.bookkeeper.replication.ReplicationException.CompatibilityException;
-import org.apache.bookkeeper.versioning.Version;
-import org.apache.zookeeper.AsyncCallback.VoidCallback;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
@@ -117,7 +108,9 @@ public class RpcLedgerManagerFactory extends LedgerManagerFactory {
 
     @Override
     public LedgerManager newLedgerManager() {
-        return new RpcLedgerManager(lmService, lmFutureService, );
+        return new RpcLedgerManager(lmService,
+            lmFutureService,
+            ClientResources.create(conf, null).workerPool());
     }
 
     @Override

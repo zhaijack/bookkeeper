@@ -579,7 +579,7 @@ public class LedgerMetadata {
      *          Re-read metadata
      * @return true if the metadata is conflict.
      */
-    boolean isConflictWith(LedgerMetadata newMeta) {
+    public boolean isConflictWith(LedgerMetadata newMeta) {
         /*
          *  if length & close have changed, then another client has
          *  opened the ledger, can't resolve this conflict.

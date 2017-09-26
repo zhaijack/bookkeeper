@@ -25,15 +25,15 @@ import static org.apache.bookkeeper.client.utils.RpcUtils.removeLedgerMetadataRe
 import static org.apache.bookkeeper.client.utils.RpcUtils.writeLedgerMetadataRequest;
 
 import com.google.common.base.Optional;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.TreeSet;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.BKException.Code;
 import org.apache.bookkeeper.client.LedgerMetadata;
@@ -45,8 +45,10 @@ import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.LedgerMetadataListener;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.Processor;
+import org.apache.bookkeeper.proto.rpc.common.StatusCode;
 import org.apache.bookkeeper.proto.rpc.metadata.GetLedgerRangesRequest;
 import org.apache.bookkeeper.proto.rpc.metadata.GetLedgerRangesResponse;
+import org.apache.bookkeeper.proto.rpc.metadata.GetLedgerRangesResponse.LedgerRangeFormat;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataRequest;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataResponse;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc.LedgerMetadataServiceFutureStub;
@@ -271,12 +273,7 @@ class RpcLedgerManager implements LedgerManager {
         throw new UnsupportedOperationException("Iterating ledgers is not supported by RPC yet.");
     }
 
-    private static final int DEFAULT_GET_LEDGER_RANGES_LIMIT = 20;
-
-    private LedgerRange decodeFromByteBuffer(ByteString source, int count) {
-        // TODO: decode ledgers from grpc returned ByteString.
-        return new LedgerRange(new TreeSet<Long>);
-    }
+    private static final int DEFAULT_GET_LEDGER_RANGES_LIMIT = 100;
 
     @Override
     public LedgerRangeIterator getLedgerRanges() {
@@ -286,14 +283,20 @@ class RpcLedgerManager implements LedgerManager {
             LedgerRange nextRange;
             @Override
             public void onNext(GetLedgerRangesResponse response) {
-                ByteString encodedBytes = response.getSerializedRanges();
-                nextRange = decodeFromByteBuffer(encodedBytes, response.getCount());
-                nextRanges.add(nextRange);
+                if (response.getCode() == StatusCode.SUCCESS) {
+                    Preconditions.checkState(response.getCode() == StatusCode.SUCCESS, "Expect Success");
+                    LedgerRangeFormat encodedBytes = response.getLedgerRange();
+                    nextRange = new LedgerRange(new HashSet<>(encodedBytes.getLedgerIdsList()));
+                    nextRanges.add(nextRange);
+                } else {
+                    log.error("response.getCode: {}", response.getCode());
+                }
             }
 
             @Override
             public void onError(Throwable cause) {
                 nextRange = null;
+                log.error(cause.getMessage());
             }
 
             @Override
