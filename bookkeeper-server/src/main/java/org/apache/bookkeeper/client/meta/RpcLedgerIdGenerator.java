@@ -21,6 +21,7 @@ package org.apache.bookkeeper.client.meta;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import java.io.IOException;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.BKException.Code;
 import org.apache.bookkeeper.meta.LedgerIdGenerator;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;

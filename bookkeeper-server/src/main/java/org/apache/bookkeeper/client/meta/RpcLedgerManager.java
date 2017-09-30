@@ -25,11 +25,12 @@ import static org.apache.bookkeeper.client.utils.RpcUtils.removeLedgerMetadataRe
 import static org.apache.bookkeeper.client.utils.RpcUtils.writeLedgerMetadataRequest;
 
 import com.google.common.base.Optional;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import io.grpc.stub.StreamObserver;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -264,6 +265,10 @@ class RpcLedgerManager implements LedgerManager {
         }
     }
 
+    /**
+     * AsyncProcessLedgers is most called by replicator and not by end-user client,
+     * So not support asyncProcessLedgers currently
+     */
     @Override
     public void asyncProcessLedgers(Processor<Long> processor,
                                     VoidCallback finalCb,
@@ -277,14 +282,13 @@ class RpcLedgerManager implements LedgerManager {
 
     @Override
     public LedgerRangeIterator getLedgerRanges() {
-        final List<LedgerRange> nextRanges = Lists.newArrayList();
+        final List<LedgerRange> nextRanges = Collections.synchronizedList(new ArrayList<LedgerRange>());
         GetLedgerRangesRequest request = getLedgerRangesRequest(DEFAULT_GET_LEDGER_RANGES_LIMIT);
         StreamObserver<GetLedgerRangesResponse> observer = new StreamObserver<GetLedgerRangesResponse>() {
             LedgerRange nextRange;
             @Override
             public void onNext(GetLedgerRangesResponse response) {
                 if (response.getCode() == StatusCode.SUCCESS) {
-                    Preconditions.checkState(response.getCode() == StatusCode.SUCCESS, "Expect Success");
                     LedgerRangeFormat encodedBytes = response.getLedgerRange();
                     nextRange = new LedgerRange(new HashSet<>(encodedBytes.getLedgerIdsList()));
                     nextRanges.add(nextRange);
@@ -308,11 +312,9 @@ class RpcLedgerManager implements LedgerManager {
         lmService.iterate(request, observer);
 
         return new LedgerRangeIterator() {
-            private int nextIndex = 0;
-
             @Override
             synchronized public boolean hasNext() throws IOException {
-                return nextRanges.size() > nextIndex;
+                return nextRanges.size() > 0;
             }
 
             @Override
@@ -320,7 +322,8 @@ class RpcLedgerManager implements LedgerManager {
                 if (!hasNext()) {
                     throw new NoSuchElementException();
                 }
-                return nextRanges.get(nextIndex ++);
+                // always return the first item in the range list.
+                return nextRanges.remove(0);
             }
         };
     }

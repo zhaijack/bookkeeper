@@ -40,6 +40,10 @@ public class BookieRpcService extends AbstractLifecycleComponent<RpcConfiguratio
         this.builder = builder;
     }
 
+    public BookieRpcServerSpec getBuilder() {
+        return builder;
+    }
+
     @Override
     protected void doStart() {
         this.rpcServer = BookieRpcServer.build(builder);

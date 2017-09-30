@@ -19,6 +19,9 @@
 package org.apache.bookkeeper.server.rpc;
 
 import static org.apache.bookkeeper.util.BookKeeperConstants.INVALID_LEDGER_ID;
+import static org.apache.bookkeeper.versioning.LongVersion.ANY_LONG;
+import static org.apache.bookkeeper.versioning.LongVersion.ANY_LONG_VALUE;
+import static org.apache.bookkeeper.versioning.Version.ANY;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.Lists;
@@ -29,6 +32,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.BKException.Code;
 import org.apache.bookkeeper.client.LedgerMetadata;
 import org.apache.bookkeeper.meta.LedgerIdGenerator;
@@ -52,6 +56,7 @@ import org.apache.bookkeeper.versioning.Version;
 /**
  * Grpc based ledger metadata service.
  */
+@Slf4j
 public class LedgerMetadataRpcService extends LedgerMetadataServiceImplBase {
 
     private final LedgerIdGenerator generator;
@@ -92,13 +97,14 @@ public class LedgerMetadataRpcService extends LedgerMetadataServiceImplBase {
                                     LongVersion version,
                                     LedgerMetadataFormat format,
                                     StreamObserver<LedgerMetadataResponse> respObserver) {
-        LedgerMetadataResponse resp = LedgerMetadataResponse.newBuilder()
+        LedgerMetadataResponse.Builder resp = LedgerMetadataResponse.newBuilder()
             .setLedgerId(ledgerId)
             .setVersion(version.getLongVersion())
-            .setCode(StatusCode.SUCCESS)
-            .setMetadata(format)
-            .build();
-        respObserver.onNext(resp);
+            .setCode(StatusCode.SUCCESS);
+        if (format != null) {
+            resp.setMetadata(format);
+        }
+        respObserver.onNext(resp.build());
     }
 
     static void sendSuccessAllocateResponse(long ledgerId,
@@ -152,7 +158,6 @@ public class LedgerMetadataRpcService extends LedgerMetadataServiceImplBase {
     public void create(long ledgerId,
                        LedgerMetadataFormat format,
                        StreamObserver<LedgerMetadataResponse> respObserver) {
-
         LedgerMetadata metadata;
         try {
             metadata = LedgerMetadata.fromLedgerMetadataFormat(
@@ -192,7 +197,14 @@ public class LedgerMetadataRpcService extends LedgerMetadataServiceImplBase {
     @Override
     public void remove(LedgerMetadataRequest request,
                        StreamObserver<LedgerMetadataResponse> responseObserver) {
-        LongVersion version = new LongVersion(request.getExpectedVersion());
+        Version version;
+        long versionValue = request.getExpectedVersion();
+        if (versionValue == ANY_LONG_VALUE) {
+            version = ANY;
+        } else {
+            version = new LongVersion(versionValue);
+        }
+
         lm.removeLedgerMetadata(request.getLedgerId(), version, (rc, value) -> {
             if (Code.NoSuchLedgerExistsException == rc) {
                 completeErrorResponse(

@@ -37,6 +37,7 @@ import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc.LedgerMetadataServiceFutureStub;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc.LedgerMetadataServiceStub;
 import org.apache.bookkeeper.replication.ReplicationException.CompatibilityException;
+import org.apache.bookkeeper.stats.NullStatsLogger;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 
@@ -110,7 +111,7 @@ public class RpcLedgerManagerFactory extends LedgerManagerFactory {
     public LedgerManager newLedgerManager() {
         return new RpcLedgerManager(lmService,
             lmFutureService,
-            ClientResources.create(conf, null).workerPool());
+            ClientResources.create(conf, NullStatsLogger.INSTANCE).workerPool());
     }
 
     @Override

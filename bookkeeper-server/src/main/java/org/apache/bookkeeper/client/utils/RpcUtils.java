@@ -94,9 +94,16 @@ public final class RpcUtils {
 
     public static LedgerMetadataRequest removeLedgerMetadataRequest(long ledgerId,
                                                                     Version version) {
+        LongVersion longVersion;
+        if(version == Version.ANY) {
+            longVersion = LongVersion.ANY_LONG;
+        } else {
+            longVersion = (LongVersion) version;
+        }
+
         return LedgerMetadataRequest.newBuilder()
             .setLedgerId(ledgerId)
-            .setExpectedVersion(((LongVersion) version).getLongVersion())
+            .setExpectedVersion(longVersion.getLongVersion())
             .build();
     }
 

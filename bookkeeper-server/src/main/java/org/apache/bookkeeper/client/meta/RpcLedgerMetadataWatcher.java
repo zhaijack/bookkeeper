@@ -150,6 +150,9 @@ class RpcLedgerMetadataWatcher implements AutoCloseable {
         }
         Occurred occurred;
         synchronized (this) {
+            if (this.metadata == null) {
+                this.metadata = newMetadata;
+            }
             occurred = this.metadata.getVersion().compare(newMetadata.getVersion());
             if (log.isDebugEnabled()) {
                 log.debug("Try to update metadata from {} to {} : {}", this.metadata, newMetadata, occurred);
