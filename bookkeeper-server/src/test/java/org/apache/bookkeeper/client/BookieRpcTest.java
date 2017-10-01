@@ -31,6 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
 import org.apache.bookkeeper.client.meta.RpcLedgerManager;
 import org.apache.bookkeeper.conf.ServerConfiguration;
@@ -222,36 +224,38 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
 
 
             // register a listener
-            final CountDownLatch updateLatch = new CountDownLatch(1);
+            final AtomicInteger metadataChanged = new AtomicInteger(0);
             bkc.getLedgerManager().registerLedgerMetadataListener(lh.getId(),
               new BookkeeperInternalCallbacks.LedgerMetadataListener() {
                   @Override
-                  public void onChanged( long ledgerId, LedgerMetadata metadata ) {
+                  public void onChanged(long ledgerId, LedgerMetadata metadata) {
                       assertEquals(ledgerId, lh.getId());
-                      LOG.info("listener metadata :{}", metadata.toString());
-                      assertEquals(metadata, null);
-                      updateLatch.countDown();
+                      //assertFalse(metadataChanged.get() == 0);
+                      metadataChanged.incrementAndGet();
+                      LOG.info("listener metadata :{}", (metadata == null) ? "null" : metadata.toString());
                   }
               });
 
-            LOG.info("before close :{}", lh.getLedgerMetadata().toString());
-
             // this will use updateLedgerOp to call writeLedgerMetadata
             lh.close();
-            LOG.info("after close :{}", lh.getLedgerMetadata().toString());
 
-
-            //assertTrue(updateLatch.await(2000, TimeUnit.MILLISECONDS));
-
+            Thread.sleep(100);
+            // verify we listened metadata changes. add listener + write
+            assertEquals(2, metadataChanged.get());
 
             // this will call removeLedgerMetadata
             bkc.deleteLedger(lh.getId());
-            try {
-                lh.addEntry("add entry after delete should fail".getBytes());
-                Assert.fail("should have thrown exception");
-            } catch (BKException.BKLedgerClosedException ex) {
-            }
+
+            Thread.sleep(100);
+            assertTrue(metadataChanged.get() == 3);
         }
+
+        try {
+            lhs.get(0).addEntry("add entry after delete should fail".getBytes());
+            Assert.fail("should have thrown exception");
+        } catch (BKException.BKLedgerClosedException ex) {
+        }
+
     }
 
     // Create 270 ledgers to test iterate:

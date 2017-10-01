@@ -24,13 +24,13 @@ import static org.apache.bookkeeper.client.utils.RpcUtils.readLedgerMetadataRequ
 import com.google.common.base.Optional;
 import com.google.common.collect.Sets;
 import io.grpc.stub.StreamObserver;
-import java.io.IOException;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.bookkeeper.client.LedgerMetadata;
 import org.apache.bookkeeper.common.util.OrderedScheduler;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.LedgerMetadataListener;
+import org.apache.bookkeeper.proto.DataFormats;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataRequest;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataResponse;
 import org.apache.bookkeeper.proto.rpc.metadata.LedgerMetadataServiceGrpc.LedgerMetadataServiceStub;
@@ -95,13 +95,17 @@ class RpcLedgerMetadataWatcher implements AutoCloseable {
                 @Override
                 public void onNext(LedgerMetadataResponse response) {
                     try {
+                        LedgerMetadata newMetadata = null;
+                        if (response.getMetadata() != DataFormats.LedgerMetadataFormat.getDefaultInstance()) {
+                            newMetadata = LedgerMetadata.fromLedgerMetadataFormat(
+                              response.getMetadata(),
+                              new LongVersion(response.getVersion()),
+                              Optional.absent());
+                        }
                         updateLedgerMetadata(
-                            response.getLedgerId(),
-                            LedgerMetadata.fromLedgerMetadataFormat(
-                                response.getMetadata(),
-                                new LongVersion(response.getVersion()),
-                                Optional.absent()));
-                    } catch (IOException ioe) {
+                          response.getLedgerId(),
+                          newMetadata);
+                    } catch (Exception ioe) {
                         // the ledger metadata response is bad
                         log.error("Received bad ledger metadata response from watching ledger {} : {}",
                             ledgerId, response, ioe);
@@ -140,24 +144,21 @@ class RpcLedgerMetadataWatcher implements AutoCloseable {
 
     void updateLedgerMetadata(long lid, LedgerMetadata newMetadata) {
         if (log.isDebugEnabled()) {
-            log.debug("Received ledger metadata update on {} : {}", lid, newMetadata);
+            log.debug("Received ledger metadata update on {} : {}",
+              lid, newMetadata == null ? "null": newMetadata.toString());
         }
         if (this.ledgerId != lid) {
             return;
         }
-        if (null == newMetadata) {
-            return;
-        }
         Occurred occurred;
         synchronized (this) {
-            if (this.metadata == null) {
-                this.metadata = newMetadata;
+            if (newMetadata != null && metadata != null) {
+                occurred = this.metadata.getVersion().compare(newMetadata.getVersion());
+            } else {
+                occurred = Occurred.AFTER;
             }
-            occurred = this.metadata.getVersion().compare(newMetadata.getVersion());
-            if (log.isDebugEnabled()) {
-                log.debug("Try to update metadata from {} to {} : {}", this.metadata, newMetadata, occurred);
-            }
-            if (Occurred.BEFORE == occurred) { // the metadata is updated
+            // listener added || metadata deleted || metadata updated
+            if (this.metadata == null || newMetadata == null || Occurred.BEFORE == occurred) {
                 this.metadata = newMetadata;
                 for (LedgerMetadataListener listener : listeners) {
                     listener.onChanged(lid, newMetadata);

@@ -378,7 +378,8 @@ public class LedgerMetadataRpcService extends LedgerMetadataServiceImplBase {
 
         @Override
         public void onNext(LedgerMetadataRequest request) {
-            this.scheduler.submitOrdered(responseObserver, () -> new SafeRunnable() {
+            //this.scheduler.submitOrdered(responseObserver, () -> new SafeRunnable() {
+            scheduler.submit(new SafeRunnable() {
                 @Override
                 public void safeRun() {
                     unsafeProcessLedgerMetadataRequest(request);
@@ -444,29 +445,30 @@ public class LedgerMetadataRpcService extends LedgerMetadataServiceImplBase {
         // ledger metadata listener
         //
 
+        // when changed will readmetadata and return metadata, while delete, will return null
         @Override
         public void onChanged(long ledgerId, LedgerMetadata metadata) {
-            scheduler.submitOrdered(responseObserver, new SafeRunnable() {
+//            scheduler.submitOrdered(responseObserver, new SafeRunnable() {
+              scheduler.submit(new SafeRunnable() {
                 @Override
                 public void safeRun() {
                     unsafeProcessLedgerMetadata(metadata);
-                }
+               }
             });
         }
 
         private void unsafeProcessLedgerMetadata(LedgerMetadata metadata) {
-            LongVersion version = (LongVersion) metadata.getVersion();
+            LongVersion version = (metadata != null) ? (LongVersion) metadata.getVersion() : new LongVersion(-1L);
             long longVersion = version.getLongVersion();
-            if (longVersion >= expectedVersion) {
-                if (longVersion > expectedVersion) {
-                    // send the updated metadata to client
-                    sendSuccessResponse(
-                        lid,
-                        version,
-                        metadata.toProtoFormat(),
-                        responseObserver);
-                    this.expectedVersion = longVersion;
-                }
+
+            if (metadata == null || longVersion >= expectedVersion) {
+                // send the updated metadata to client
+                sendSuccessResponse(
+                    lid,
+                    version,
+                    metadata != null ? metadata.toProtoFormat() : null,
+                    responseObserver);
+                this.expectedVersion = longVersion;
             } else {
                 // we received a smaller version of ledger metadata
                 // that means that the bookie connect to a lagging metadata storage node
