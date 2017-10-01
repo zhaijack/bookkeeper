@@ -21,6 +21,8 @@
 package org.apache.bookkeeper.client;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import com.google.common.collect.Lists;
@@ -30,7 +32,9 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import org.apache.bookkeeper.client.BookKeeper.DigestType;
+import org.apache.bookkeeper.client.meta.RpcLedgerManager;
 import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.proto.BookieServer;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
@@ -179,14 +183,14 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
         }
     }
 
-    // Test create ledger, write entries, close ledger, and delete ledger
+    // Test operations of create ledger, write entries, close ledger, and delete ledger
     // should success trigger generateLedgerId, createLedgerMetadata, writeLedgerMetadata and removeLedgerMetadata
     @Test
     public void testLedgersOperation() throws Exception {
         assertTrue(bkc.getUnderlyingLedgerManager().getClass().getSimpleName().equals("RpcLedgerManager"));
 
         int numLedgers = 3;
-        // this will call generateLedgerId, and createLedgerMetadata
+        // This is for operations test, and will call generateLedgerId, and createLedgerMetadata
         List<LedgerHandle> lhs = createLedgers(numLedgers, 3, 2);
 
         // Write the entries for the ledgers with dummy values.
@@ -237,7 +241,7 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
             LOG.info("after close :{}", lh.getLedgerMetadata().toString());
 
 
-            assertTrue(updateLatch.await(2000, TimeUnit.MILLISECONDS));
+            //assertTrue(updateLatch.await(2000, TimeUnit.MILLISECONDS));
 
 
             // this will call removeLedgerMetadata
@@ -250,5 +254,39 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
         }
     }
 
+    // Create 270 ledgers to test iterate:
+    // In each iterate, it will return 100, which is RpcLedgerManager.DEFAULT_GET_LEDGER_RANGES_LIMIT, ledgers.
+    // So expect iterate 3 times, then hasNext() will return false.
+    @Test
+    public void testGetLedgerRanges() throws Exception {
+        int iterSize = RpcLedgerManager.DEFAULT_GET_LEDGER_RANGES_LIMIT;
+        assertEquals(100, iterSize);
+        List<LedgerHandle> lhs2 = createLedgers(270, 3, 2);
+        LedgerManager.LedgerRangeIterator iterator = bkc.getLedgerManager().getLedgerRanges();
+
+        assertNotNull(iterator);
+        Thread.sleep(100);
+        assertTrue(iterator.hasNext());
+
+        if (iterator.hasNext()) {
+            LedgerManager.LedgerRange ledgerRange = iterator.next();
+            assertEquals(100, ledgerRange.size());
+        }
+
+        assertTrue(iterator.hasNext());
+        if (iterator.hasNext()) {
+            LedgerManager.LedgerRange ledgerRange = iterator.next();
+            assertEquals(100, ledgerRange.size());
+        }
+
+        assertTrue(iterator.hasNext());
+        if (iterator.hasNext()) {
+            LedgerManager.LedgerRange ledgerRange = iterator.next();
+            assertEquals(70, ledgerRange.size());
+        }
+
+        assertFalse(iterator.hasNext());
+        assertFalse(iterator.hasNext());
+    }
 
 }

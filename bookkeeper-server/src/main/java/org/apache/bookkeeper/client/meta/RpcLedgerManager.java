@@ -62,7 +62,7 @@ import org.apache.zookeeper.AsyncCallback.VoidCallback;
  * A RPC based {@link LedgerManager}.
  */
 @Slf4j
-class RpcLedgerManager implements LedgerManager {
+public class RpcLedgerManager implements LedgerManager {
 
     private static final int DEFAULT_MAX_NUM_RETRIES = 3;
 
@@ -278,7 +278,7 @@ class RpcLedgerManager implements LedgerManager {
         throw new UnsupportedOperationException("Iterating ledgers is not supported by RPC yet.");
     }
 
-    private static final int DEFAULT_GET_LEDGER_RANGES_LIMIT = 100;
+    public static final int DEFAULT_GET_LEDGER_RANGES_LIMIT = 100;
 
     @Override
     public LedgerRangeIterator getLedgerRanges() {
