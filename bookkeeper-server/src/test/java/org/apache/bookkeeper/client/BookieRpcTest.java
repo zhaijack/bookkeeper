@@ -36,7 +36,7 @@ import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.meta.LedgerManager;
 import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.proto.BookieServer;
-import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks;
+import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.LedgerMetadataListener;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.GenericCallback;
 import org.apache.bookkeeper.server.ServerResources;
 import org.apache.bookkeeper.server.conf.RpcConfiguration;
@@ -234,7 +234,7 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
     public void testGetLedgerRanges() throws Exception {
         int iterSize = RpcLedgerManager.DEFAULT_GET_LEDGER_RANGES_LIMIT;
         assertEquals(100, iterSize);
-        List<LedgerHandle> lhs2 = createLedgers(270, 3, 2);
+        List<LedgerHandle> lhs = createLedgers(270, 3, 2);
         LedgerManager.LedgerRangeIterator iterator = bkc.getLedgerManager().getLedgerRanges();
 
         assertNotNull(iterator);
@@ -262,8 +262,8 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
         assertFalse(iterator.hasNext());
     }
 
-    // Test operations of create ledger, write entries, close ledger, and delete ledger
-    // should success trigger generateLedgerId, createLedgerMetadata, writeLedgerMetadata and removeLedgerMetadata
+    // Test add listener: create ledgers, add listener to each ledger.
+    // Verify listeners called while ledgermedata change and ledger delete.
     @Test
     public void testAddListener() throws Exception {
         assertTrue(bkc.getUnderlyingLedgerManager().getClass().getSimpleName().equals("RpcLedgerManager"));
@@ -275,7 +275,7 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
             // register a listener
             final AtomicInteger metadataChanged = new AtomicInteger(0);
             bkc.getLedgerManager().registerLedgerMetadataListener(lh.getId(),
-              new BookkeeperInternalCallbacks.LedgerMetadataListener() {
+              new LedgerMetadataListener() {
                   @Override
                   public void onChanged(long ledgerId, LedgerMetadata metadata) {
                       assertEquals(ledgerId, lh.getId());
@@ -288,15 +288,53 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
             lh.close();
 
             Thread.sleep(200);
-            // verify we listened metadata changes. add listener + write
+            // verify we listened metadata changes. 2 = add listener + write
             assertEquals(2, metadataChanged.get());
 
             // this will call removeLedgerMetadata
             bkc.deleteLedger(lh.getId());
 
             Thread.sleep(200);
-            assertEquals(3, metadataChanged.get());
+            assertEquals(2, metadataChanged.get());
         }
+    }
 
+    // Test add listener: create ledgers, add listener and remove listener to each ledger.
+    // Verify listeners work as expected.
+    @Test
+    public void testRemoveListener() throws Exception {
+        assertTrue(bkc.getUnderlyingLedgerManager().getClass().getSimpleName().equals("RpcLedgerManager"));
+
+        int numLedgers = 3;
+        List<LedgerHandle> lhs = createLedgers(numLedgers, 3, 2);
+
+        for (LedgerHandle lh : lhs) {
+            // register a listener
+            final AtomicInteger metadataChanged = new AtomicInteger(0);
+            LedgerMetadataListener listener = new LedgerMetadataListener() {
+                @Override
+                public void onChanged(long ledgerId, LedgerMetadata metadata) {
+                    assertEquals(ledgerId, lh.getId());
+                    metadataChanged.incrementAndGet();
+                    LOG.info("listener metadataChanged :{}", metadataChanged.get());
+                }
+            };
+            bkc.getLedgerManager().registerLedgerMetadataListener(lh.getId(), listener);
+
+            // this will use updateLedgerOp to call writeLedgerMetadata
+            lh.close();
+
+            Thread.sleep(200);
+            // verify we listened metadata changes. add listener + write
+            assertEquals(2, metadataChanged.get());
+
+            bkc.getLedgerManager().unregisterLedgerMetadataListener(lh.getId(), listener);
+
+            // After unregister listener, counter will not change while delete the ledger.
+            bkc.deleteLedger(lh.getId());
+
+            Thread.sleep(200);
+            assertEquals(2, metadataChanged.get());
+        }
     }
 }
