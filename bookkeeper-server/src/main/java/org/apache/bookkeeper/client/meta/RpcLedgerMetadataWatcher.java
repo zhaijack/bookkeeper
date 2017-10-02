@@ -72,7 +72,9 @@ class RpcLedgerMetadataWatcher implements AutoCloseable {
     public synchronized RpcLedgerMetadataWatcher addListener(LedgerMetadataListener listener) {
         listeners.add(listener);
         if (null != metadata) {
-            listener.onChanged(ledgerId, metadata);
+            for (LedgerMetadataListener l : listeners) {
+                l.onChanged( ledgerId, metadata );
+            }
         } else if (listeners.size() == 1) { // the first listener will trigger the watch operation
             watch();
         }

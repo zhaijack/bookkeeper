@@ -378,8 +378,7 @@ public class LedgerMetadataRpcService extends LedgerMetadataServiceImplBase {
 
         @Override
         public void onNext(LedgerMetadataRequest request) {
-            //this.scheduler.submitOrdered(responseObserver, () -> new SafeRunnable() {
-            scheduler.submit(new SafeRunnable() {
+            this.scheduler.submitOrdered(responseObserver, new SafeRunnable() {
                 @Override
                 public void safeRun() {
                     unsafeProcessLedgerMetadataRequest(request);
@@ -448,8 +447,7 @@ public class LedgerMetadataRpcService extends LedgerMetadataServiceImplBase {
         // when changed will readmetadata and return metadata, while delete, will return null
         @Override
         public void onChanged(long ledgerId, LedgerMetadata metadata) {
-//            scheduler.submitOrdered(responseObserver, new SafeRunnable() {
-              scheduler.submit(new SafeRunnable() {
+            scheduler.submitOrdered(responseObserver, new SafeRunnable() {
                 @Override
                 public void safeRun() {
                     unsafeProcessLedgerMetadata(metadata);
