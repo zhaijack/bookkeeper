@@ -58,12 +58,7 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
 
     private final static Logger LOG = LoggerFactory.getLogger(BookieRpcTest.class);
 
-    //BookKeeperClusterTestCase bootstrapCluster;
-
-    // Objects to use for this jUnit test.
-    DigestType digestType =  DigestType.CRC32;
-
-    BookKeeperAdmin bkAdmin;
+    // rpc services in each bookie
     List<BookieRpcService> rpcServices = Lists.newArrayList();
 
     // Constructor
@@ -137,7 +132,6 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
         }
 
         baseClientConf.setClientBootstrapBookies(addresses);
-        LOG.info("config: " + baseClientConf.getClientBootstrapBookies());
         if (numBookies > 0) {
             bkc = new BookKeeperTestClient(baseClientConf);
         }
@@ -156,7 +150,7 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
         InterruptedException {
         List<LedgerHandle> lhs = new ArrayList<LedgerHandle>();
         for (int i = 0; i < numLedgers; i++) {
-            lhs.add(bkc.createLedger(ensemble, quorum, digestType, "".getBytes()));
+            lhs.add(bkc.createLedger(ensemble, quorum, DigestType.CRC32, "".getBytes()));
         }
         return lhs;
     }
@@ -275,7 +269,6 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
         assertTrue(bkc.getUnderlyingLedgerManager().getClass().getSimpleName().equals("RpcLedgerManager"));
 
         int numLedgers = 3;
-        // This is for operations test, and will call generateLedgerId, and createLedgerMetadata
         List<LedgerHandle> lhs = createLedgers(numLedgers, 3, 2);
 
         for (LedgerHandle lh : lhs) {
@@ -286,9 +279,7 @@ public class BookieRpcTest extends BookKeeperClusterTestCase {
                   @Override
                   public void onChanged(long ledgerId, LedgerMetadata metadata) {
                       assertEquals(ledgerId, lh.getId());
-                      //assertFalse(metadataChanged.get() == 0);
                       metadataChanged.incrementAndGet();
-                      LOG.info("listener metadata :{}", (metadata == null) ? "null" : metadata.toString());
                       LOG.info("listener metadataChanged :{}", metadataChanged.get());
                   }
               });
