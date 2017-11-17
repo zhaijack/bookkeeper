@@ -32,7 +32,7 @@ import org.apache.bookkeeper.conf.ClientConfiguration;
  */
 @Public
 @Unstable
-public interface LedgerEntry {
+public interface LedgerEntry extends AutoCloseable {
 
     /**
      * The id of the ledger which contains the entry.
@@ -56,11 +56,9 @@ public interface LedgerEntry {
     long getLength();
 
     /**
-     * Returns the content of the entry. This method can be called only once. While using v2 wire protocol this method
-     * will automatically release the internal ByteBuf.
+     * Returns the content of the entry.
      *
      * @return the content of the entry
-     * @throws IllegalStateException if this method is called twice
      */
     byte[] getEntry();
 
@@ -77,4 +75,10 @@ public interface LedgerEntry {
      */
     ByteBuf getEntryBuffer();
 
+    /**
+     * Returns a duplicate of this entry.
+     *
+     * @return the duplicated entry
+     */
+    LedgerEntry duplicate();
 }

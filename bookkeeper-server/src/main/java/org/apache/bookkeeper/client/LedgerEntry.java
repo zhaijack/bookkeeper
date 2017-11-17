@@ -23,41 +23,36 @@ package org.apache.bookkeeper.client;
 import com.google.common.base.Preconditions;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
-
 import java.io.InputStream;
+import org.apache.bookkeeper.client.impl.LedgerEntryImpl;
 import org.apache.bookkeeper.conf.ClientConfiguration;
 
 /**
  * Ledger entry. Its a simple tuple containing the ledger id, the entry-id, and
  * the entry content.
  *
+ * @Deprecated since 4.6.0, in favor of using {@link org.apache.bookkeeper.client.impl.LedgerEntryImpl}.
  */
-public class LedgerEntry
-    implements org.apache.bookkeeper.client.api.LedgerEntry {
+public class LedgerEntry {
 
-    final long ledgerId;
-    long entryId;
-    long length;
+    final LedgerEntryImpl ledgerEntry;
     ByteBuf data;
 
     LedgerEntry(long lId, long eId) {
-        this.ledgerId = lId;
-        this.entryId = eId;
+        ledgerEntry = LedgerEntryImpl.create(lId, eId, 0L, null);
+        data = ledgerEntry.getEntryBuffer();
     }
 
-    @Override
     public long getLedgerId() {
-        return ledgerId;
+        return ledgerEntry.getLedgerId();
     }
 
-    @Override
     public long getEntryId() {
-        return entryId;
+        return ledgerEntry.getEntryId();
     }
 
-    @Override
     public long getLength() {
-        return length;
+        return ledgerEntry.getLength();
     }
 
     /**
@@ -68,7 +63,6 @@ public class LedgerEntry
      * @return the content of the entry
      * @throws IllegalStateException if this method is called twice
      */
-    @Override
     public byte[] getEntry() {
         Preconditions.checkState(null != data, "entry content can be accessed only once");
         byte[] entry = new byte[data.readableBytes()];
@@ -105,7 +99,6 @@ public class LedgerEntry
      * @throws IllegalStateException if the entry has been retrieved by {@link #getEntry()}
      * or {@link #getEntryInputStream()}.
      */
-    @Override
     public ByteBuf getEntryBuffer() {
         Preconditions.checkState(null != data, "entry content has been retrieved" +
             " by #getEntry or #getEntryInputStream");

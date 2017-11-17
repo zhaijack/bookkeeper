@@ -98,9 +98,9 @@ class PendingReadOp implements Enumeration<LedgerEntry>, ReadEntryCallback {
                     .reorderReadSequence(
                             ensemble,
                             lh.bookieFailureHistory.asMap(),
-                            lh.distributionSchedule.getWriteSet(entryId));
+                            lh.distributionSchedule.getWriteSet(getEntryId()));
             } else {
-                writeSet = lh.distributionSchedule.getWriteSet(entryId);
+                writeSet = lh.distributionSchedule.getWriteSet(getEntryId());
             }
         }
 
@@ -124,7 +124,7 @@ class PendingReadOp implements Enumeration<LedgerEntry>, ReadEntryCallback {
         boolean complete(int bookieIndex, BookieSocketAddress host, final ByteBuf buffer) {
             ByteBuf content;
             try {
-                content = lh.macManager.verifyDigestAndReturnData(entryId, buffer);
+                content = lh.macManager.verifyDigestAndReturnData(getEntryId(), buffer);
             } catch (BKDigestMatchException e) {
                 logErrorAndReattemptRead(bookieIndex, host, "Mac mismatch", BKException.Code.DigestMatchException);
                 buffer.release();
@@ -137,8 +137,8 @@ class PendingReadOp implements Enumeration<LedgerEntry>, ReadEntryCallback {
                  * The length is a long and it is the last field of the metadata of an entry.
                  * Consequently, we have to subtract 8 from METADATA_LENGTH to get the length.
                  */
-                length = buffer.getLong(DigestManager.METADATA_LENGTH - 8);
-                data = content;
+                ledgerEntry.setLength(buffer.getLong(DigestManager.METADATA_LENGTH - 8));
+                ledgerEntry.setEntryBuf(content);
                 writeSet.recycle();
                 return true;
             } else {
@@ -195,12 +195,12 @@ class PendingReadOp implements Enumeration<LedgerEntry>, ReadEntryCallback {
                 ++numMissedEntryReads;
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("No such entry found on bookie.  L{} E{} bookie: {}",
-                        new Object[] { lh.ledgerId, entryId, host });
+                        new Object[] { lh.ledgerId, getEntryId(), host });
                 }
             } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug(errMsg + " while reading L{} E{} from bookie: {}",
-                        new Object[]{lh.ledgerId, entryId, host});
+                        new Object[]{lh.ledgerId, getEntryId(), host});
                 }
             }
         }
@@ -235,7 +235,7 @@ class PendingReadOp implements Enumeration<LedgerEntry>, ReadEntryCallback {
 
         @Override
         public String toString() {
-            return String.format("L%d-E%d", ledgerId, entryId);
+            return String.format("L%d-E%d", getLedgerId(), getEntryId());
         }
 
         /**
@@ -531,7 +531,7 @@ class PendingReadOp implements Enumeration<LedgerEntry>, ReadEntryCallback {
             lh.throttler.acquire();
         }
 
-        lh.bk.getBookieClient().readEntry(to, lh.ledgerId, entry.entryId,
+        lh.bk.getBookieClient().readEntry(to, lh.ledgerId, entry.getEntryId(),
                                      this, new ReadContext(bookieIndex, to, entry));
     }
 

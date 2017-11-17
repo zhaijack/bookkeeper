@@ -81,7 +81,7 @@ class ReadLastConfirmedAndEntryOp implements BookkeeperInternalCallbacks.ReadEnt
             super(lId, eId);
 
             this.ensemble = ensemble;
-            this.writeSet = lh.distributionSchedule.getWriteSet(entryId);
+            this.writeSet = lh.distributionSchedule.getWriteSet(getEntryId());
             if (lh.bk.reorderReadSequence) {
                 this.orderedEnsemble = lh.bk.placementPolicy.reorderReadLACSequence(ensemble,
                         lh.bookieFailureHistory.asMap(), writeSet.copy());
@@ -125,12 +125,12 @@ class ReadLastConfirmedAndEntryOp implements BookkeeperInternalCallbacks.ReadEnt
                 writeSet.recycle();
                 orderedEnsemble.recycle();
                 rc = BKException.Code.OK;
-                this.entryId = entryId;
+                this.ledgerEntry.setEntryId(entryId);
                 /*
                  * The length is a long and it is the last field of the metadata of an entry.
                  * Consequently, we have to subtract 8 from METADATA_LENGTH to get the length.
                  */
-                length = buffer.getLong(DigestManager.METADATA_LENGTH - 8);
+                this.ledgerEntry.setLength(buffer.getLong(DigestManager.METADATA_LENGTH - 8));
                 data = content;
                 return true;
             } else {
@@ -193,13 +193,13 @@ class ReadLastConfirmedAndEntryOp implements BookkeeperInternalCallbacks.ReadEnt
                 // treat these errors as failures if the node from which we received this is part of
                 // the writeSet
                 if (this.writeSet.contains(bookieIndex)) {
-                    lh.registerOperationFailureOnBookie(host, entryId);
+                    lh.registerOperationFailureOnBookie(host, getEntryId());
                 }
                 ++numMissedEntryReads;
             }
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug(errMsg + " while reading entry: " + entryId + " ledgerId: " + lh.ledgerId + " from bookie: "
+                LOG.debug(errMsg + " while reading entry: " + getEntryId() + " ledgerId: " + lh.ledgerId + " from bookie: "
                     + host);
             }
         }
@@ -234,7 +234,7 @@ class ReadLastConfirmedAndEntryOp implements BookkeeperInternalCallbacks.ReadEnt
 
         @Override
         public String toString() {
-            return String.format("L%d-E%d", ledgerId, entryId);
+            return String.format("L%d-E%d", getLedgerId(), getEntryId());
         }
     }
 
