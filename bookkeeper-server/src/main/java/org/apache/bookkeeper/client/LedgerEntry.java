@@ -33,7 +33,7 @@ import org.apache.bookkeeper.conf.ClientConfiguration;
  *
  * @Deprecated since 4.6.0, in favor of using {@link org.apache.bookkeeper.client.impl.LedgerEntryImpl}.
  */
-public class LedgerEntry {
+public class LedgerEntry implements org.apache.bookkeeper.client.api.LedgerEntry {
 
     final LedgerEntryImpl ledgerEntry;
 
@@ -41,14 +41,17 @@ public class LedgerEntry {
         ledgerEntry = LedgerEntryImpl.create(lId, eId, 0L, null);
     }
 
+    @Override
     public long getLedgerId() {
         return ledgerEntry.getLedgerId();
     }
 
+    @Override
     public long getEntryId() {
         return ledgerEntry.getEntryId();
     }
 
+    @Override
     public long getLength() {
         return ledgerEntry.getLength();
     }
@@ -61,6 +64,7 @@ public class LedgerEntry {
      * @return the content of the entry
      * @throws IllegalStateException if this method is called twice
      */
+    @Override
     public byte[] getEntry() {
         ByteBuf data = ledgerEntry.getEntryBuffer();
         Preconditions.checkState(null != data, "entry content can be accessed only once");
@@ -97,10 +101,22 @@ public class LedgerEntry {
      * @throws IllegalStateException if the entry has been retrieved by {@link #getEntry()}
      * or {@link #getEntryInputStream()}.
      */
+    @Override
     public ByteBuf getEntryBuffer() {
         ByteBuf data = ledgerEntry.getEntryBuffer();
         Preconditions.checkState(null != data, "entry content has been retrieved" +
             " by #getEntry or #getEntryInputStream");
         return data;
+    }
+
+    @Override
+    public org.apache.bookkeeper.client.api.LedgerEntry duplicate() {
+        // new method in api, not implemented
+        return null;
+    }
+
+    @Override
+    public void close() throws Exception {
+        // new method in api, not implemented
     }
 }

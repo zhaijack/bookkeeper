@@ -563,7 +563,7 @@ public class BookKeeperTest extends BookKeeperClusterTestCase {
                 // without readUnconfirmedEntries we are not able to read all of the entries
                 try {
                     rlh.readEntries(0, numOfEntries - 1);
-                    fail("shoud not be able to read up to "+ (numOfEntries - 1) + " with readEntries");
+                    fail("should not be able to read up to "+ (numOfEntries - 1) + " with readEntries");
                 } catch (BKException.BKReadException expected) {
                 }
 
@@ -720,7 +720,7 @@ public class BookKeeperTest extends BookKeeperClusterTestCase {
                     readEntries.hasMoreElements();) {
                     LedgerEntry entry = readEntries.nextElement();
                     try {
-                        entry.data.release();
+                        entry.getEntryBuffer().release();
                     } catch (IllegalReferenceCountException ok) {
                         fail("ByteBuf already released");
                     }
@@ -740,7 +740,7 @@ public class BookKeeperTest extends BookKeeperClusterTestCase {
                     readEntries.hasMoreElements();) {
                     LedgerEntry entry = readEntries.nextElement();
                     try {
-                        entry.data.release();
+                        entry.getEntryBuffer().release();
                     } catch (IllegalReferenceCountException e) {
                         fail("ByteBuf already released");
                     }
@@ -759,10 +759,10 @@ public class BookKeeperTest extends BookKeeperClusterTestCase {
                 for (Enumeration<LedgerEntry> readEntries = lh.readEntries(0, numEntries - 1);
                     readEntries.hasMoreElements();) {
                     LedgerEntry entry = readEntries.nextElement();
-                    assertTrue("Can't release entry " + entry.getEntryId() + ": ref = " + entry.data.refCnt(),
-                        entry.data.release());
+                    assertTrue("Can't release entry " + entry.getEntryId() + ": ref = " + entry.getEntryBuffer().refCnt(),
+                        entry.getEntryBuffer().release());
                     try {
-                        assertFalse(entry.data.release());
+                        assertFalse(entry.getEntryBuffer().release());
                         fail("ByteBuf already released");
                     } catch (IllegalReferenceCountException ok) {
                     }
@@ -783,10 +783,10 @@ public class BookKeeperTest extends BookKeeperClusterTestCase {
                     readEntries.hasMoreElements();) {
                     LedgerEntry entry = readEntries.nextElement();
                     // ButeBufs not reference counter
-                    assertTrue("Can't release entry " + entry.getEntryId() + ": ref = " + entry.data.refCnt(),
-                        entry.data.release());
+                    assertTrue("Can't release entry " + entry.getEntryId() + ": ref = " + entry.getEntryBuffer().refCnt(),
+                        entry.getEntryBuffer().release());
                     try {
-                        assertFalse(entry.data.release());
+                        assertFalse(entry.getEntryBuffer().release());
                         fail("ByteBuf already released");
                     } catch (IllegalReferenceCountException ok) {
                     }
