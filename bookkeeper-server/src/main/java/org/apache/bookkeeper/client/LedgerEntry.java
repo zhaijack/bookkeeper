@@ -36,11 +36,9 @@ import org.apache.bookkeeper.conf.ClientConfiguration;
 public class LedgerEntry {
 
     final LedgerEntryImpl ledgerEntry;
-    ByteBuf data;
 
     LedgerEntry(long lId, long eId) {
         ledgerEntry = LedgerEntryImpl.create(lId, eId, 0L, null);
-        data = ledgerEntry.getEntryBuffer();
     }
 
     public long getLedgerId() {
@@ -64,11 +62,11 @@ public class LedgerEntry {
      * @throws IllegalStateException if this method is called twice
      */
     public byte[] getEntry() {
+        ByteBuf data = ledgerEntry.getEntryBuffer();
         Preconditions.checkState(null != data, "entry content can be accessed only once");
         byte[] entry = new byte[data.readableBytes()];
         data.readBytes(entry);
         data.release();
-        data = null;
         return entry;
     }
 
@@ -82,9 +80,9 @@ public class LedgerEntry {
      * @throws IllegalStateException if this method is called twice
      */
     public InputStream getEntryInputStream() {
+        ByteBuf data = ledgerEntry.getEntryBuffer();
         Preconditions.checkState(null != data, "entry content can be accessed only once");
         ByteBufInputStream res = new ByteBufInputStream(data);
-        data = null;
         return res;
     }
 
@@ -100,6 +98,7 @@ public class LedgerEntry {
      * or {@link #getEntryInputStream()}.
      */
     public ByteBuf getEntryBuffer() {
+        ByteBuf data = ledgerEntry.getEntryBuffer();
         Preconditions.checkState(null != data, "entry content has been retrieved" +
             " by #getEntry or #getEntryInputStream");
         return data;

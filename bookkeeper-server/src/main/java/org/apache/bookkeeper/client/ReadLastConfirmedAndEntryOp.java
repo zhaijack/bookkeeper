@@ -131,7 +131,7 @@ class ReadLastConfirmedAndEntryOp implements BookkeeperInternalCallbacks.ReadEnt
                  * Consequently, we have to subtract 8 from METADATA_LENGTH to get the length.
                  */
                 this.ledgerEntry.setLength(buffer.getLong(DigestManager.METADATA_LENGTH - 8));
-                data = content;
+                this.ledgerEntry.setEntryBuf(content);
                 return true;
             } else {
                 return false;
