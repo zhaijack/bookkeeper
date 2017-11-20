@@ -686,31 +686,31 @@ public class LedgerHandle implements WriteHandle {
 
     void asyncReadEntriesInternal(long firstEntry, long lastEntry, ReadCallback cb, Object ctx) {
         readEntriesInternalAsync(firstEntry, lastEntry)
-            .whenCompleteAsync(new FutureEventListener<Iterable<org.apache.bookkeeper.client.api.LedgerEntry>>() {
-            @Override
-            public void onSuccess(Iterable<org.apache.bookkeeper.client.api.LedgerEntry> iterable) {
-                cb.readComplete(
-                    Code.OK,
-                    LedgerHandle.this,
-                    IteratorUtils.asEnumeration(
-                        Iterators.transform(iterable.iterator(), le -> {
-                            LedgerEntry entry = new LedgerEntry((LedgerEntryImpl) le);
-                            le.close();
-                            return entry;
-                        })),
-                    ctx);
-            }
-
-            @Override
-            public void onFailure(Throwable cause) {
-                if (cause instanceof BKException) {
-                    BKException bke = (BKException) cause;
-                    cb.readComplete(bke.getCode(), LedgerHandle.this, null, ctx);
-                } else {
-                    cb.readComplete(Code.UnexpectedConditionException, LedgerHandle.this, null, ctx);
+            .whenComplete(new FutureEventListener<Iterable<org.apache.bookkeeper.client.api.LedgerEntry>>() {
+                @Override
+                public void onSuccess(Iterable<org.apache.bookkeeper.client.api.LedgerEntry> iterable) {
+                    cb.readComplete(
+                        Code.OK,
+                        LedgerHandle.this,
+                        IteratorUtils.asEnumeration(
+                            Iterators.transform(iterable.iterator(), le -> {
+                                LedgerEntry entry = new LedgerEntry((LedgerEntryImpl) le);
+                                le.close();
+                                return entry;
+                            })),
+                        ctx);
                 }
-            }
-        }, bk.getMainWorkerPool().chooseThread(ledgerId));
+
+                @Override
+                public void onFailure(Throwable cause) {
+                    if (cause instanceof BKException) {
+                        BKException bke = (BKException) cause;
+                        cb.readComplete(bke.getCode(), LedgerHandle.this, null, ctx);
+                    } else {
+                        cb.readComplete(Code.UnexpectedConditionException, LedgerHandle.this, null, ctx);
+                    }
+                }
+            });
     }
 
     CompletableFuture<Iterable<org.apache.bookkeeper.client.api.LedgerEntry>> readEntriesInternalAsync(long firstEntry,

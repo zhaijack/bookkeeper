@@ -503,9 +503,14 @@ class ReadLastConfirmedAndEntryOp implements BookkeeperInternalCallbacks.ReadEnt
                 .registerFailedEvent(latencyMicros, TimeUnit.MICROSECONDS);
             entry = null;
         } else {
+            // could received advanced lac, with no entry
             lh.bk.getReadLacAndEntryOpLogger()
                 .registerSuccessfulEvent(latencyMicros, TimeUnit.MICROSECONDS);
-            entry = new LedgerEntry(request.entryImpl);
+            if (request.entryImpl.getEntryBuffer() != null) {
+                entry = new LedgerEntry(request.entryImpl);
+            } else {
+                entry = null;
+            }
         }
         request.close();
         cb.readLastConfirmedAndEntryComplete(rc, lastAddConfirmed, entry);
