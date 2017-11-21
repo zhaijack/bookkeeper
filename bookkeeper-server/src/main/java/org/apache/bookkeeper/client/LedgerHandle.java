@@ -20,6 +20,8 @@
  */
 package org.apache.bookkeeper.client;
 
+import static org.apache.bookkeeper.client.api.BKException.Code.ClientClosedException;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.cache.CacheBuilder;
@@ -685,38 +687,46 @@ public class LedgerHandle implements WriteHandle {
     }
 
     void asyncReadEntriesInternal(long firstEntry, long lastEntry, ReadCallback cb, Object ctx) {
-        readEntriesInternalAsync(firstEntry, lastEntry)
-            .whenCompleteAsync(new FutureEventListener<Iterable<org.apache.bookkeeper.client.api.LedgerEntry>>() {
-                @Override
-                public void onSuccess(Iterable<org.apache.bookkeeper.client.api.LedgerEntry> iterable) {
-                    cb.readComplete(
-                        Code.OK,
-                        LedgerHandle.this,
-                        IteratorUtils.asEnumeration(
-                            Iterators.transform(iterable.iterator(), le -> {
-                                LedgerEntry entry = new LedgerEntry((LedgerEntryImpl) le);
-                                le.close();
-                                return entry;
-                            })),
-                        ctx);
-                }
-
-                @Override
-                public void onFailure(Throwable cause) {
-                    if (cause instanceof BKException) {
-                        BKException bke = (BKException) cause;
-                        cb.readComplete(bke.getCode(), LedgerHandle.this, null, ctx);
-                    } else {
-                        cb.readComplete(Code.UnexpectedConditionException, LedgerHandle.this, null, ctx);
+        if(!bk.isClosed()) {
+            readEntriesInternalAsync(firstEntry, lastEntry)
+                .whenCompleteAsync(new FutureEventListener<Iterable<org.apache.bookkeeper.client.api.LedgerEntry>>() {
+                    @Override
+                    public void onSuccess(Iterable<org.apache.bookkeeper.client.api.LedgerEntry> iterable) {
+                        cb.readComplete(
+                            Code.OK,
+                            LedgerHandle.this,
+                            IteratorUtils.asEnumeration(
+                                Iterators.transform(iterable.iterator(), le -> {
+                                    LedgerEntry entry = new LedgerEntry((LedgerEntryImpl) le);
+                                    le.close();
+                                    return entry;
+                                })),
+                            ctx);
                     }
-                }
-            }, bk.getMainWorkerPool().chooseThread(ledgerId));
+
+                    @Override
+                    public void onFailure(Throwable cause) {
+                        if (cause instanceof BKException) {
+                            BKException bke = (BKException) cause;
+                            cb.readComplete(bke.getCode(), LedgerHandle.this, null, ctx);
+                        } else {
+                            cb.readComplete(Code.UnexpectedConditionException, LedgerHandle.this, null, ctx);
+                        }
+                    }
+                }, bk.getMainWorkerPool().chooseThread(ledgerId));
+        } else {
+            cb.readComplete(Code.ClientClosedException, LedgerHandle.this, null, ctx);
+        }
     }
 
     CompletableFuture<Iterable<org.apache.bookkeeper.client.api.LedgerEntry>> readEntriesInternalAsync(long firstEntry,
                                                                                                        long lastEntry) {
         PendingReadOp op = new PendingReadOp(this, bk.getScheduler(), firstEntry, lastEntry);
-        bk.getMainWorkerPool().submitOrdered(ledgerId, op);
+        if(!bk.isClosed()) {
+            bk.getMainWorkerPool().submitOrdered(ledgerId, op);
+        } else {
+            op.future().completeExceptionally(BKException.create(ClientClosedException));
+        }
         return op.future();
     }
 

@@ -333,7 +333,9 @@ public class BookKeeperCloseTest extends BookKeeperClusterTestCase {
             fail("should have failed, client is closed");
         } catch (BKClientClosedException e) {
             // correct
-        }
+        } /*catch (Exception e) {
+            e.printStackTrace();
+        }*/
 
         final CountDownLatch readLatch = new CountDownLatch(1);
         final AtomicInteger rc = new AtomicInteger(BKException.Code.OK);
