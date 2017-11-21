@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.bookkeeper.client.BKException.BKDigestMatchException;
 import org.apache.bookkeeper.client.api.LedgerEntry;
 import org.apache.bookkeeper.client.impl.LedgerEntryImpl;
+import org.apache.bookkeeper.common.util.SafeRunnable;
 import org.apache.bookkeeper.net.BookieSocketAddress;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ReadEntryCallback;
 import org.apache.bookkeeper.proto.BookkeeperInternalCallbacks.ReadEntryCallbackCtx;
@@ -52,7 +53,7 @@ import org.slf4j.LoggerFactory;
  * application as soon as it arrives rather than waiting for the whole thing.
  *
  */
-class PendingReadOp implements ReadEntryCallback {
+class PendingReadOp implements ReadEntryCallback, SafeRunnable {
     private static final Logger LOG = LoggerFactory.getLogger(PendingReadOp.class);
 
     private final ScheduledExecutorService scheduler;
@@ -473,7 +474,11 @@ class PendingReadOp implements ReadEntryCallback {
         return this;
     }
 
-    public PendingReadOp initiate() {
+    public void submit() {
+        lh.bk.getMainWorkerPool().submitOrdered(lh.ledgerId, this);
+    }
+
+    void initiate() {
         long nextEnsembleChange = startEntryId, i = startEntryId;
         this.requestTimeNanos = MathUtils.nowInNano();
         ArrayList<BookieSocketAddress> ensemble = null;
@@ -498,7 +503,11 @@ class PendingReadOp implements ReadEntryCallback {
                 lh.bk.getReadSpeculativeRequestPolicy().get().initiateSpeculativeRequest(scheduler, entry);
             }
         }
-        return this;
+    }
+
+    @Override
+    public void safeRun() {
+        initiate();
     }
 
     private static class ReadContext implements ReadEntryCallbackCtx {

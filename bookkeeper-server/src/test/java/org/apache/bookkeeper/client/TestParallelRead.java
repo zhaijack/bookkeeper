@@ -77,7 +77,7 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
         for (int i = 0; i < numEntries; i++) {
             PendingReadOp readOp =
                     new PendingReadOp(lh, lh.bk.scheduler, i, i);
-            readOp.parallelRead(true).initiate();
+            readOp.parallelRead(true).submit();
             Iterable<LedgerEntry> iterable = readOp.future().get();
             assertNotNull(iterable);
             Iterator<LedgerEntry> entries = iterable.iterator();
@@ -92,7 +92,7 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
         // read multiple entries
         PendingReadOp readOp =
                 new PendingReadOp(lh, lh.bk.scheduler, 0, numEntries - 1);
-        readOp.parallelRead(true).initiate();
+        readOp.parallelRead(true).submit();
         Iterable<LedgerEntry> iterable = readOp.future().get();
         assertNotNull(iterable);
         Iterator<LedgerEntry> iterator = iterable.iterator();
@@ -131,12 +131,12 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
         // read single entry
         PendingReadOp readOp =
                 new PendingReadOp(lh, lh.bk.scheduler, 11, 11);
-        readOp.parallelRead(true).initiate();
+        readOp.parallelRead(true).submit();
         expectFail(readOp.future(), Code.NoSuchEntryException);
 
         // read multiple entries
         readOp = new PendingReadOp(lh, lh.bk.scheduler, 8, 11);
-        readOp.parallelRead(true).initiate();
+        readOp.parallelRead(true).submit();
         expectFail(readOp.future(), Code.NoSuchEntryException);
 
         lh.close();
@@ -165,7 +165,7 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
 
         PendingReadOp readOp =
                 new PendingReadOp(lh, lh.bk.scheduler, 10, 10);
-        readOp.parallelRead(true).initiate();
+        readOp.parallelRead(true).submit();
         // would fail immediately if found missing entries don't cover ack quorum
         expectFail(readOp.future(), Code.NoSuchEntryException);
         latch1.countDown();
@@ -197,7 +197,7 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
         // read multiple entries
         PendingReadOp readOp =
                 new PendingReadOp(lh, lh.bk.scheduler, 0, numEntries - 1);
-        readOp.parallelRead(true).initiate();
+        readOp.parallelRead(true).submit();
         Iterable<LedgerEntry> iterable = readOp.future().get();
         assertNotNull(iterable);
         Iterator<LedgerEntry> entries = iterable.iterator();
@@ -238,7 +238,7 @@ public class TestParallelRead extends BookKeeperClusterTestCase {
         // read multiple entries
         PendingReadOp readOp =
                 new PendingReadOp(lh, lh.bk.scheduler, 0, numEntries - 1);
-        readOp.parallelRead(true).initiate();
+        readOp.parallelRead(true).submit();
         expectFail(readOp.future(), Code.BookieHandleNotAvailableException);
 
         lh.close();

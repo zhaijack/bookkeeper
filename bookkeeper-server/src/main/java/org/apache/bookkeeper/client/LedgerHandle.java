@@ -686,7 +686,7 @@ public class LedgerHandle implements WriteHandle {
 
     void asyncReadEntriesInternal(long firstEntry, long lastEntry, ReadCallback cb, Object ctx) {
         readEntriesInternalAsync(firstEntry, lastEntry)
-            .whenComplete(new FutureEventListener<Iterable<org.apache.bookkeeper.client.api.LedgerEntry>>() {
+            .whenCompleteAsync(new FutureEventListener<Iterable<org.apache.bookkeeper.client.api.LedgerEntry>>() {
                 @Override
                 public void onSuccess(Iterable<org.apache.bookkeeper.client.api.LedgerEntry> iterable) {
                     cb.readComplete(
@@ -710,12 +710,14 @@ public class LedgerHandle implements WriteHandle {
                         cb.readComplete(Code.UnexpectedConditionException, LedgerHandle.this, null, ctx);
                     }
                 }
-            });
+            }, bk.getMainWorkerPool().chooseThread(ledgerId));
     }
 
     CompletableFuture<Iterable<org.apache.bookkeeper.client.api.LedgerEntry>> readEntriesInternalAsync(long firstEntry,
                                                                                                        long lastEntry) {
-        return new PendingReadOp(this, bk.getScheduler(), firstEntry, lastEntry).initiate().future();
+        PendingReadOp op = new PendingReadOp(this, bk.getScheduler(), firstEntry, lastEntry);
+        bk.getMainWorkerPool().submitOrdered(ledgerId, op);
+        return op.future();
     }
 
     /**
