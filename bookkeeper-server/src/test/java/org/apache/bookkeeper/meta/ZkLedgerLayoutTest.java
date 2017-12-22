@@ -33,16 +33,17 @@ import org.apache.bookkeeper.conf.ClientConfiguration;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.apache.bookkeeper.util.BookKeeperConstants;
 import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.ZooDefs;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.junit.Test;
 
 /**
- * Test the ledger layout.
+ * Test store/read/delete ledger layout operations on zookeeper.
  */
-public class LedgerLayoutTest extends BookKeeperClusterTestCase {
+public class ZkLedgerLayoutTest extends BookKeeperClusterTestCase {
 
-    public LedgerLayoutTest() {
+    public ZkLedgerLayoutTest() {
         super(0);
     }
 
@@ -55,16 +56,21 @@ public class LedgerLayoutTest extends BookKeeperClusterTestCase {
         zkc.create(ledgerRootPath, new byte[0],
                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
-        LedgerLayout layout = LedgerLayout.readLayout(zkc, ledgerRootPath);
-        assertTrue("Layout should be null", layout == null);
+        try {
+            ZkLedgerLayoutUtils.readLayout(zkc, ledgerRootPath);
+            fail("Layout should not be found");
+        } catch (NoNodeException nee) {
+            assertTrue("Layout should not be found", true);
+        }
 
         String testName = "foobar";
         int testVersion = 0xdeadbeef;
         // use layout defined in configuration also create it in zookeeper
         LedgerLayout layout2 = new LedgerLayout(testName, testVersion);
-        layout2.store(zkc, ledgerRootPath, ZooDefs.Ids.OPEN_ACL_UNSAFE);
+        ZkLedgerLayoutUtils.storeLayout(
+            layout2, zkc, ledgerRootPath, ZooDefs.Ids.OPEN_ACL_UNSAFE);
 
-        layout = LedgerLayout.readLayout(zkc, ledgerRootPath);
+        LedgerLayout layout = ZkLedgerLayoutUtils.readLayout(zkc, ledgerRootPath);
         assertEquals(testName, layout.getManagerFactoryClass());
         assertEquals(testVersion, layout.getManagerVersion());
     }
@@ -80,7 +86,8 @@ public class LedgerLayoutTest extends BookKeeperClusterTestCase {
         f.setAccessible(true);
         f.set(layout, layoutVersion);
 
-        layout.store(zkc, ledgersRootPath, ZooDefs.Ids.OPEN_ACL_UNSAFE);
+        ZkLedgerLayoutUtils.storeLayout(
+            layout, zkc, ledgersRootPath, ZooDefs.Ids.OPEN_ACL_UNSAFE);
     }
 
     @Test
@@ -93,7 +100,7 @@ public class LedgerLayoutTest extends BookKeeperClusterTestCase {
                           LedgerLayout.LAYOUT_FORMAT_VERSION + 1);
 
         try {
-            LedgerLayout.readLayout(zkc, conf.getZkLedgersRootPath());
+            ZkLedgerLayoutUtils.readLayout(zkc, conf.getZkLedgersRootPath());
             fail("Shouldn't reach here!");
         } catch (IOException ie) {
             assertTrue("Invalid exception", ie.getMessage().contains("version not compatible"));
@@ -112,7 +119,7 @@ public class LedgerLayoutTest extends BookKeeperClusterTestCase {
                                  Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
         try {
-            LedgerLayout.readLayout(zkc, conf.getZkLedgersRootPath());
+            ZkLedgerLayoutUtils.readLayout(zkc, conf.getZkLedgersRootPath());
             fail("Shouldn't reach here!");
         } catch (IOException ie) {
             assertTrue("Invalid exception", ie.getMessage().contains("version absent from"));
@@ -133,7 +140,7 @@ public class LedgerLayoutTest extends BookKeeperClusterTestCase {
                                  Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
         try {
-            LedgerLayout.readLayout(zkc, rootPath);
+            ZkLedgerLayoutUtils.readLayout(zkc, rootPath);
             fail("Shouldn't reach here!");
         } catch (IOException ie) {
             assertTrue("Invalid exception", ie.getMessage().contains("Invalid Ledger Manager"));
@@ -148,7 +155,7 @@ public class LedgerLayoutTest extends BookKeeperClusterTestCase {
                           FlatLedgerManagerFactory.NAME,
                           FlatLedgerManagerFactory.CUR_VERSION, 1);
 
-        LedgerLayout layout = LedgerLayout.readLayout(zkc, conf.getZkLedgersRootPath());
+        LedgerLayout layout = ZkLedgerLayoutUtils.readLayout(zkc, conf.getZkLedgersRootPath());
         assertNotNull("Should not be null", layout);
         assertEquals(FlatLedgerManagerFactory.NAME, layout.getManagerFactoryClass());
         assertEquals(FlatLedgerManagerFactory.CUR_VERSION, layout.getManagerVersion());

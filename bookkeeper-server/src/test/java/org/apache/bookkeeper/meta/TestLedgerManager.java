@@ -60,7 +60,8 @@ public class TestLedgerManager extends BookKeeperClusterTestCase {
         f.setAccessible(true);
         f.set(layout, layoutVersion);
 
-        layout.store(zkc, ledgersRootPath, ZooDefs.Ids.OPEN_ACL_UNSAFE);
+        ZkLedgerLayoutUtils.storeLayout(
+            layout, zkc, ledgersRootPath, ZooDefs.Ids.OPEN_ACL_UNSAFE);
     }
 
     /**
@@ -164,8 +165,9 @@ public class TestLedgerManager extends BookKeeperClusterTestCase {
                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         conf.setZkLedgersRootPath(root0);
 
-        new LedgerLayout("DoesNotExist",
-                         0xdeadbeef).store(zkc, root0, ZooDefs.Ids.OPEN_ACL_UNSAFE);
+        LedgerLayout layout = new LedgerLayout("DoesNotExist",
+                         0xdeadbeef);
+        ZkLedgerLayoutUtils.storeLayout(layout, zkc, root0, ZooDefs.Ids.OPEN_ACL_UNSAFE);
 
         try {
             LedgerManagerFactory.newLedgerManagerFactory(conf, zkc);
@@ -182,8 +184,9 @@ public class TestLedgerManager extends BookKeeperClusterTestCase {
                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         conf.setZkLedgersRootPath(root1);
 
-        new LedgerLayout(FlatLedgerManagerFactory.class.getName(),
-                         0xdeadbeef).store(zkc, root1, ZooDefs.Ids.OPEN_ACL_UNSAFE);
+        LedgerLayout layout1 = new LedgerLayout(FlatLedgerManagerFactory.class.getName(),
+                         0xdeadbeef);
+        ZkLedgerLayoutUtils.storeLayout(layout1, zkc, root1, ZooDefs.Ids.OPEN_ACL_UNSAFE);
 
         try {
             LedgerManagerFactory.newLedgerManagerFactory(conf, zkc);

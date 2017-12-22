@@ -26,6 +26,7 @@ import org.apache.bookkeeper.util.ReflectionUtils;
 import org.apache.bookkeeper.util.ZkUtils;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.zookeeper.KeeperException;
+import org.apache.zookeeper.KeeperException.NoNodeException;
 import org.apache.zookeeper.ZooKeeper;
 import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
@@ -133,7 +134,13 @@ public abstract class LedgerManagerFactory {
 
         // check that the configured ledger manager is
         // compatible with the existing layout
-        LedgerLayout layout = LedgerLayout.readLayout(zk, ledgerRootPath);
+        LedgerLayout layout;
+        try {
+            layout = ZkLedgerLayoutUtils.readLayout(zk, ledgerRootPath);
+        } catch (NoNodeException nee) {
+            // no layout is found
+            layout = null;
+        }
         if (layout == null) { // no existing layout
             lmFactory = createNewLMFactory(conf, zk, factoryClass);
             return lmFactory
@@ -230,9 +237,9 @@ public abstract class LedgerManagerFactory {
                 lmFactory.getCurrentVersion());
         List<ACL> zkAcls = ZkUtils.getACLs(conf);
         try {
-            layout.store(zk, ledgerRootPath, zkAcls);
+            ZkLedgerLayoutUtils.storeLayout(layout, zk, ledgerRootPath, zkAcls);
         } catch (KeeperException.NodeExistsException nee) {
-            LedgerLayout layout2 = LedgerLayout.readLayout(zk, ledgerRootPath);
+            LedgerLayout layout2 = ZkLedgerLayoutUtils.readLayout(zk, ledgerRootPath);
             if (!layout2.equals(layout)) {
                 throw new IOException(
                         "Contention writing to layout to zookeeper, "
@@ -262,9 +269,7 @@ public abstract class LedgerManagerFactory {
             throw new IOException("Failed to get ledger manager factory class from configuration : ", e);
         }
 
-        LedgerLayout layout = LedgerLayout.readLayout(zk,
-                conf.getZkLedgersRootPath());
-        layout.delete(zk, conf.getZkLedgersRootPath());
+        ZkLedgerLayoutUtils.deleteLayout(zk, conf.getZkLedgersRootPath());
         // Create new layout information again.
         createNewLMFactory(conf, zk, factoryClass);
     }
