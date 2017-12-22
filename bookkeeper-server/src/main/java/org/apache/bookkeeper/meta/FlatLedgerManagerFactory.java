@@ -46,7 +46,7 @@ public class FlatLedgerManagerFactory extends LedgerManagerFactory {
 
     @Override
     public LedgerManagerFactory initialize(final AbstractConfiguration conf,
-                                           final ZooKeeper zk,
+                                           final LayoutManager layoutManager,
                                            final int factoryVersion)
     throws IOException {
         if (CUR_VERSION != factoryVersion) {

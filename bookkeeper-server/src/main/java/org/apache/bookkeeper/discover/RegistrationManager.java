@@ -22,6 +22,8 @@ import org.apache.bookkeeper.bookie.BookieException;
 import org.apache.bookkeeper.common.annotation.InterfaceAudience.LimitedPrivate;
 import org.apache.bookkeeper.common.annotation.InterfaceStability.Evolving;
 import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.meta.LayoutManager;
+import org.apache.bookkeeper.meta.LedgerLayout;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.versioning.Version;
 import org.apache.bookkeeper.versioning.Versioned;
@@ -31,7 +33,7 @@ import org.apache.bookkeeper.versioning.Versioned;
  */
 @LimitedPrivate
 @Evolving
-public interface RegistrationManager extends AutoCloseable {
+public interface RegistrationManager extends LayoutManager, AutoCloseable {
 
     /**
      * Registration Listener on listening the registration state.

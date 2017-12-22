@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.util.List;
 
 import org.apache.bookkeeper.conf.AbstractConfiguration;
+import org.apache.bookkeeper.discover.RegistrationManager;
+import org.apache.bookkeeper.meta.LayoutManager.LedgerLayoutExistsException;
 import org.apache.bookkeeper.replication.ReplicationException;
 import org.apache.bookkeeper.util.ReflectionUtils;
 import org.apache.bookkeeper.util.ZkUtils;
@@ -53,15 +55,15 @@ public abstract class LedgerManagerFactory {
      *
      * @param conf
      *          Configuration object used to initialize factory
-     * @param zk
-     *          Available zookeeper handle for ledger manager to use.
+     * @param layoutManager
+     *          Layout manager used for initialize ledger manager factory
      * @param factoryVersion
      *          What version used to initialize factory.
      * @return ledger manager factory instance
      * @throws IOException when fail to initialize the factory.
      */
     public abstract LedgerManagerFactory initialize(AbstractConfiguration conf,
-                                                    ZooKeeper zk,
+                                                    LayoutManager layoutManager,
                                                     int factoryVersion)
     throws IOException;
 
@@ -104,13 +106,13 @@ public abstract class LedgerManagerFactory {
      *
      * @param conf
      *          Configuration Object.
-     * @param zk
-     *          ZooKeeper Client Handle, talk to zk to know which ledger manager is used.
+     * @param layoutManager
+     *          layout manager
      * @return new ledger manager factory
      * @throws IOException
      */
     public static LedgerManagerFactory newLedgerManagerFactory(
-        final AbstractConfiguration<?> conf, final ZooKeeper zk)
+        final AbstractConfiguration<?> conf, LayoutManager layoutManager)
             throws IOException, KeeperException, InterruptedException {
         Class<? extends LedgerManagerFactory> factoryClass;
         try {
@@ -125,7 +127,7 @@ public abstract class LedgerManagerFactory {
         }
 
         // if zk is null, return the default ledger manager
-        if (zk == null) {
+        if (layoutManager == null) {
             return new FlatLedgerManagerFactory()
                    .initialize(conf, null, FlatLedgerManagerFactory.CUR_VERSION);
         }
@@ -134,17 +136,12 @@ public abstract class LedgerManagerFactory {
 
         // check that the configured ledger manager is
         // compatible with the existing layout
-        LedgerLayout layout;
-        try {
-            layout = ZkLedgerLayoutUtils.readLayout(zk, ledgerRootPath);
-        } catch (NoNodeException nee) {
-            // no layout is found
-            layout = null;
-        }
+        LedgerLayout layout = layoutManager.readLayout();
+
         if (layout == null) { // no existing layout
-            lmFactory = createNewLMFactory(conf, zk, factoryClass);
+            lmFactory = createNewLMFactory(conf, layoutManager, factoryClass);
             return lmFactory
-                    .initialize(conf, zk, lmFactory.getCurrentVersion());
+                    .initialize(conf, layoutManager, lmFactory.getCurrentVersion());
         }
         if (LOG.isDebugEnabled()) {
             LOG.debug("read ledger layout {}", layout);
@@ -169,7 +166,7 @@ public abstract class LedgerManagerFactory {
             } else {
                 throw new IOException("Unknown ledger manager type: " + lmType);
             }
-            return lmFactory.initialize(conf, zk, layout.getManagerVersion());
+            return lmFactory.initialize(conf, layoutManager, layout.getManagerVersion());
         }
 
         // handle V2 layout case
@@ -195,7 +192,7 @@ public abstract class LedgerManagerFactory {
         }
         // instantiate a factory
         lmFactory = ReflectionUtils.newInstance(factoryClass);
-        return lmFactory.initialize(conf, zk, layout.getManagerVersion());
+        return lmFactory.initialize(conf, layoutManager, layout.getManagerVersion());
     }
 
     /**
@@ -203,7 +200,7 @@ public abstract class LedgerManagerFactory {
      * LedgerManagerFactory instance.
      */
     private static LedgerManagerFactory createNewLMFactory(
-            final AbstractConfiguration conf, final ZooKeeper zk,
+            final AbstractConfiguration conf, final LayoutManager layoutManager,
             Class<? extends LedgerManagerFactory> factoryClass)
             throws IOException, KeeperException, InterruptedException {
 
@@ -235,11 +232,10 @@ public abstract class LedgerManagerFactory {
 
         layout = new LedgerLayout(factoryClass.getName(),
                 lmFactory.getCurrentVersion());
-        List<ACL> zkAcls = ZkUtils.getACLs(conf);
         try {
-            ZkLedgerLayoutUtils.storeLayout(layout, zk, ledgerRootPath, zkAcls);
-        } catch (KeeperException.NodeExistsException nee) {
-            LedgerLayout layout2 = ZkLedgerLayoutUtils.readLayout(zk, ledgerRootPath);
+            layoutManager.storeLayout(layout);
+        } catch (LedgerLayoutExistsException e) {
+            LedgerLayout layout2 = layoutManager.readLayout();
             if (!layout2.equals(layout)) {
                 throw new IOException(
                         "Contention writing to layout to zookeeper, "
@@ -259,7 +255,7 @@ public abstract class LedgerManagerFactory {
      * @param zk
      *            Zookeeper instance
      */
-    public void format(final AbstractConfiguration<?> conf, final ZooKeeper zk)
+    public void format(final AbstractConfiguration<?> conf, final LayoutManager lm)
             throws InterruptedException, KeeperException, IOException {
 
         Class<? extends LedgerManagerFactory> factoryClass;
@@ -269,8 +265,8 @@ public abstract class LedgerManagerFactory {
             throw new IOException("Failed to get ledger manager factory class from configuration : ", e);
         }
 
-        ZkLedgerLayoutUtils.deleteLayout(zk, conf.getZkLedgersRootPath());
+        lm.deleteLayout();
         // Create new layout information again.
-        createNewLMFactory(conf, zk, factoryClass);
+        createNewLMFactory(conf, lm, factoryClass);
     }
 }

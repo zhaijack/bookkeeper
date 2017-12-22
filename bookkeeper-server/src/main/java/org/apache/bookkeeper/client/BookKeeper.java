@@ -238,6 +238,7 @@ public class BookKeeper implements org.apache.bookkeeper.client.api.BookKeeper {
          * @return client builder.
          * @since 4.5
          */
+        @Deprecated
         public Builder zk(ZooKeeper zk) {
             this.zk = zk;
             return this;
@@ -512,7 +513,7 @@ public class BookKeeper implements org.apache.bookkeeper.client.api.BookKeeper {
         // initialize ledger manager
         try {
             this.ledgerManagerFactory =
-                LedgerManagerFactory.newLedgerManagerFactory(conf, ((ZKRegistrationClient) regClient).getZk());
+                LedgerManagerFactory.newLedgerManagerFactory(conf, regClient);
         } catch (KeeperException ke) {
             throw new ZKException();
         }

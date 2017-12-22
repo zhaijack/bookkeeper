@@ -37,6 +37,8 @@ import org.apache.bookkeeper.bookie.BookieException.BookieIllegalOpException;
 import org.apache.bookkeeper.bookie.BookieException.CookieNotFoundException;
 import org.apache.bookkeeper.bookie.BookieException.MetadataStoreException;
 import org.apache.bookkeeper.conf.ServerConfiguration;
+import org.apache.bookkeeper.meta.LayoutManager;
+import org.apache.bookkeeper.meta.ZkLayoutManager;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.util.ZkUtils;
 import org.apache.bookkeeper.versioning.LongVersion;
@@ -72,6 +74,8 @@ public class ZKRegistrationManager implements RegistrationManager {
     // registration paths
     protected String bookieRegistrationPath;
     protected String bookieReadonlyRegistrationPath;
+    // layout manager
+    private LayoutManager layoutManager;
 
     private StatsLogger statsLogger;
 
@@ -98,6 +102,12 @@ public class ZKRegistrationManager implements RegistrationManager {
         } catch (InterruptedException | KeeperException | IOException e) {
             throw new MetadataStoreException(e);
         }
+
+        this.layoutManager = new ZkLayoutManager(
+            zk,
+            conf.getZkLedgersRootPath(),
+            zkAcls);
+
         return this;
     }
 

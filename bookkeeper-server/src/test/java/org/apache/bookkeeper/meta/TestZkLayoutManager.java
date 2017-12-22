@@ -39,7 +39,7 @@ import org.junit.Test;
 /**
  * Unit test of {@link ZkLedgerLayoutUtils}.
  */
-public class TestZkLedgerLayoutUtils {
+public class TestZkLayoutManager {
 
     private static final String ledgersRootPath = "/path/to/ledgers/root";
     private static final String layoutPath = ledgersRootPath + "/" + LAYOUT_ZNODE;
@@ -48,7 +48,7 @@ public class TestZkLedgerLayoutUtils {
     private final ZooKeeper zk;
     private final LedgerLayout layout;
 
-    public TestZkLedgerLayoutUtils() {
+    public TestZkLayoutManager() {
         this.zk = mock(ZooKeeper.class);
         this.layout = new LedgerLayout(
             HierarchicalLedgerManagerFactory.class.getName(),

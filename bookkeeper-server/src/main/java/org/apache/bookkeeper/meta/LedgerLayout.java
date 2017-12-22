@@ -21,19 +21,18 @@ import java.io.IOException;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  * This class encapsulates ledger layout information that is persistently stored
- * in zookeeper. It provides parsing and serialization methods of such information.
- *
+ * in registration service. It provides parsing and serialization methods of such
+ * information.
  */
+@Slf4j
 @Getter
 @EqualsAndHashCode
 @ToString
-class LedgerLayout {
-    private static final Logger LOG = LoggerFactory.getLogger(LedgerLayout.class);
+public class LedgerLayout {
 
     // version of compability layout version
     public static final int LAYOUT_MIN_COMPAT_VERSION = 1;
@@ -80,8 +79,8 @@ class LedgerLayout {
           new StringBuilder().append(layoutFormatVersion).append(lSplitter)
               .append(managerFactoryClass).append(splitter).append(managerVersion).toString();
 
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Serialized layout info: {}", s);
+        if (log.isDebugEnabled()) {
+            log.debug("Serialized layout info: {}", s);
         }
         return s.getBytes("UTF-8");
     }
@@ -97,8 +96,8 @@ class LedgerLayout {
      */
     public static LedgerLayout parseLayout(byte[] bytes) throws IOException {
         String layout = new String(bytes, "UTF-8");
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Parsing Layout: {}", layout);
+        if (log.isDebugEnabled()) {
+            log.debug("Parsing Layout: {}", layout);
         }
 
         String lines[] = layout.split(lSplitter);
