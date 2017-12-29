@@ -18,19 +18,12 @@
 package org.apache.bookkeeper.meta;
 
 import java.io.IOException;
-import java.util.List;
-
 import org.apache.bookkeeper.conf.AbstractConfiguration;
-import org.apache.bookkeeper.discover.RegistrationManager;
 import org.apache.bookkeeper.meta.LayoutManager.LedgerLayoutExistsException;
 import org.apache.bookkeeper.replication.ReplicationException;
 import org.apache.bookkeeper.util.ReflectionUtils;
-import org.apache.bookkeeper.util.ZkUtils;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.KeeperException.NoNodeException;
-import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.data.ACL;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,7 +119,7 @@ public abstract class LedgerManagerFactory {
             throw new IOException("Empty Ledger Root Path.");
         }
 
-        // if zk is null, return the default ledger manager
+        // if layoutManager is null, return the default ledger manager
         if (layoutManager == null) {
             return new FlatLedgerManagerFactory()
                    .initialize(conf, null, FlatLedgerManagerFactory.CUR_VERSION);
@@ -136,7 +129,7 @@ public abstract class LedgerManagerFactory {
 
         // check that the configured ledger manager is
         // compatible with the existing layout
-        LedgerLayout layout = layoutManager.readLayout();
+        LedgerLayout layout = layoutManager.readLedgerLayout();
 
         if (layout == null) { // no existing layout
             lmFactory = createNewLMFactory(conf, layoutManager, factoryClass);
@@ -233,9 +226,9 @@ public abstract class LedgerManagerFactory {
         layout = new LedgerLayout(factoryClass.getName(),
                 lmFactory.getCurrentVersion());
         try {
-            layoutManager.storeLayout(layout);
+            layoutManager.storeLedgerLayout(layout);
         } catch (LedgerLayoutExistsException e) {
-            LedgerLayout layout2 = layoutManager.readLayout();
+            LedgerLayout layout2 = layoutManager.readLedgerLayout();
             if (!layout2.equals(layout)) {
                 throw new IOException(
                         "Contention writing to layout to zookeeper, "
@@ -252,8 +245,8 @@ public abstract class LedgerManagerFactory {
      *
      * @param conf
      *            Configuration instance
-     * @param zk
-     *            Zookeeper instance
+     * @param lm
+     *            Layout manager
      */
     public void format(final AbstractConfiguration<?> conf, final LayoutManager lm)
             throws InterruptedException, KeeperException, IOException {
@@ -265,7 +258,7 @@ public abstract class LedgerManagerFactory {
             throw new IOException("Failed to get ledger manager factory class from configuration : ", e);
         }
 
-        lm.deleteLayout();
+        lm.deleteLedgerLayout();
         // Create new layout information again.
         createNewLMFactory(conf, lm, factoryClass);
     }

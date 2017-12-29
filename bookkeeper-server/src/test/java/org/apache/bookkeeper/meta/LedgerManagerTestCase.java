@@ -41,6 +41,7 @@ import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.test.BookKeeperClusterTestCase;
 import org.apache.bookkeeper.util.SnapshotMap;
+import org.apache.bookkeeper.util.ZkUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.runner.RunWith;
@@ -102,7 +103,12 @@ public abstract class LedgerManagerTestCase extends BookKeeperClusterTestCase {
     @Override
     public void setUp() throws Exception {
         super.setUp();
-        ledgerManagerFactory = LedgerManagerFactory.newLedgerManagerFactory(baseConf, zkc);
+        ledgerManagerFactory = LedgerManagerFactory.newLedgerManagerFactory(
+            baseConf,
+            new ZkLayoutManager(
+                zkc,
+                baseConf.getZkLedgersRootPath(),
+                ZkUtils.getACLs(baseConf)));
     }
 
     @After

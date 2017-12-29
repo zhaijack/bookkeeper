@@ -116,4 +116,7 @@ public interface RegistrationClient extends LayoutManager, AutoCloseable {
      * @param listener listener to receive the topology changes of bookies.
      */
     void unwatchReadOnlyBookies(RegistrationListener listener);
+
+    // TODO:
+    LayoutManager getLayoutManager();
 }

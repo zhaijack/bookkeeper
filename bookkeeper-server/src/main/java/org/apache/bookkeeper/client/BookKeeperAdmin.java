@@ -1130,6 +1130,8 @@ public class BookKeeperAdmin implements AutoCloseable {
      */
     public static boolean format(ClientConfiguration conf,
             boolean isInteractive, boolean force) throws Exception {
+        // TODO: change this format into LayoutManager
+
         ZooKeeper zkc = ZooKeeperClient.newBuilder()
                 .connectString(conf.getZkServers())
                 .sessionTimeoutMs(conf.getZkTimeout())
@@ -1186,7 +1188,9 @@ public class BookKeeperAdmin implements AutoCloseable {
             }
             bkc = new BookKeeper(conf, zkc);
             // Format all ledger metadata layout
-            bkc.ledgerManagerFactory.format(conf, zkc);
+            bkc.ledgerManagerFactory.format(
+                conf,
+                bkc.regClient.getLayoutManager());
 
             // Clear underreplicated ledgers
             try {

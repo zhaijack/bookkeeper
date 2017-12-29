@@ -58,7 +58,7 @@ public class ZkLayoutManager implements LayoutManager {
      * @return ledger layout, or null if none set in zookeeper
      */
     @Override
-    public LedgerLayout readLayout() throws IOException {
+    public LedgerLayout readLedgerLayout() throws IOException {
         try {
             byte[] layoutData = zk.getData(ledgersLayout, false, null);
             return LedgerLayout.parseLayout(layoutData);
@@ -76,7 +76,7 @@ public class ZkLayoutManager implements LayoutManager {
      * Store the ledger layout to zookeeper.
      */
     @Override
-    public void storeLayout(LedgerLayout layout) throws IOException {
+    public void storeLedgerLayout(LedgerLayout layout) throws IOException {
         try {
             zk.create(ledgersLayout, layout.serialize(), acls,
                 CreateMode.PERSISTENT);
@@ -92,12 +92,9 @@ public class ZkLayoutManager implements LayoutManager {
 
     /**
      * Delete the ledger layout from zookeeper.
-     *
-     * @param zk zookeeper client
-     * @param ledgersRoot ledgers root path
      */
     @Override
-    public void deleteLayout() throws IOException {
+    public void deleteLedgerLayout() throws IOException {
         try {
             zk.delete(ledgersLayout, -1);
         } catch (InterruptedException e) {
@@ -107,5 +104,4 @@ public class ZkLayoutManager implements LayoutManager {
             throw new IOException(e);
         }
     }
-
 }

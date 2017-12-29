@@ -18,9 +18,6 @@
  */
 package org.apache.bookkeeper.meta;
 
-import static org.apache.bookkeeper.meta.ZkLedgerLayoutUtils.deleteLayout;
-import static org.apache.bookkeeper.meta.ZkLedgerLayoutUtils.readLayout;
-import static org.apache.bookkeeper.meta.ZkLedgerLayoutUtils.storeLayout;
 import static org.apache.bookkeeper.util.BookKeeperConstants.LAYOUT_ZNODE;
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.eq;
@@ -29,15 +26,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.List;
 import org.apache.zookeeper.CreateMode;
 import org.apache.zookeeper.ZooDefs.Ids;
 import org.apache.zookeeper.ZooKeeper;
-import org.apache.zookeeper.data.ACL;
 import org.junit.Test;
 
 /**
- * Unit test of {@link ZkLedgerLayoutUtils}.
+ * Unit test of {@link ZkLayoutManager}.
  */
 public class TestZkLayoutManager {
 
@@ -47,12 +42,14 @@ public class TestZkLayoutManager {
 
     private final ZooKeeper zk;
     private final LedgerLayout layout;
+    private final ZkLayoutManager zkLayoutManager;
 
     public TestZkLayoutManager() {
         this.zk = mock(ZooKeeper.class);
         this.layout = new LedgerLayout(
             HierarchicalLedgerManagerFactory.class.getName(),
             managerVersion);
+        this.zkLayoutManager = new ZkLayoutManager(zk, ledgersRootPath, Ids.OPEN_ACL_UNSAFE);
     }
 
     @Test
@@ -60,22 +57,20 @@ public class TestZkLayoutManager {
         when(zk.getData(eq(layoutPath), eq(false), eq(null)))
             .thenReturn(layout.serialize());
 
-        assertEquals(layout, readLayout(zk, ledgersRootPath));
+        assertEquals(layout, zkLayoutManager.readLedgerLayout());
     }
 
     @Test
     public void testStoreLayout() throws Exception {
-        List<ACL> acls = Ids.OPEN_ACL_UNSAFE;
-
-        storeLayout(layout, zk, ledgersRootPath, acls);
+        zkLayoutManager.storeLedgerLayout(layout);
 
         verify(zk, times(1))
-            .create(eq(layoutPath), eq(layout.serialize()), eq(acls), eq(CreateMode.PERSISTENT));
+            .create(eq(layoutPath), eq(layout.serialize()), eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
     }
 
     @Test
     public void testDeleteLayout() throws Exception {
-        deleteLayout(zk, ledgersRootPath);
+        zkLayoutManager.deleteLedgerLayout();
 
         verify(zk, times(1))
             .delete(eq(layoutPath), eq(-1));

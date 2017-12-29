@@ -25,6 +25,9 @@ import java.io.IOException;
  */
 public interface LayoutManager {
 
+    /**
+     * The Ledger layout exists exception.
+     */
     class LedgerLayoutExistsException extends IOException {
 
         public LedgerLayoutExistsException(String message) {
@@ -46,7 +49,7 @@ public interface LayoutManager {
      * @return the ledger layout
      * @throws IOException when fail to read ledger layout.
      */
-    LedgerLayout readLayout() throws IOException;
+    LedgerLayout readLedgerLayout() throws IOException;
 
     /**
      * Store the ledger layout.
@@ -54,13 +57,13 @@ public interface LayoutManager {
      * @param layout ledger layout
      * @throws IOException when fail to store ledger layout.
      */
-    void storeLayout(LedgerLayout layout) throws IOException;
+    void storeLedgerLayout(LedgerLayout layout) throws IOException;
 
     /**
      * Delete ledger layout.
      *
      * @throws IOException
      */
-    void deleteLayout() throws IOException;
+    void deleteLedgerLayout() throws IOException;
 
 }

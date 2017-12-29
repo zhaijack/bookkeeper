@@ -38,6 +38,7 @@ import org.apache.bookkeeper.bookie.BookieException.CookieNotFoundException;
 import org.apache.bookkeeper.bookie.BookieException.MetadataStoreException;
 import org.apache.bookkeeper.conf.ServerConfiguration;
 import org.apache.bookkeeper.meta.LayoutManager;
+import org.apache.bookkeeper.meta.LedgerLayout;
 import org.apache.bookkeeper.meta.ZkLayoutManager;
 import org.apache.bookkeeper.stats.StatsLogger;
 import org.apache.bookkeeper.util.ZkUtils;
@@ -397,5 +398,30 @@ public class ZKRegistrationManager implements RegistrationManager {
             throw new MetadataStoreException("Failed to get cluster instance id", e);
         }
         return instanceId;
+    }
+
+    @VisibleForTesting
+    public void setLayoutManager(LayoutManager layoutManager) {
+        this.layoutManager = layoutManager;
+    }
+
+    @Override
+    public LayoutManager getLayoutManager(){
+        return layoutManager;
+    }
+
+    @Override
+    public LedgerLayout readLedgerLayout() throws IOException {
+        return layoutManager.readLedgerLayout();
+    }
+
+    @Override
+    public void storeLedgerLayout(LedgerLayout layout) throws IOException {
+        layoutManager.storeLedgerLayout(layout);
+    }
+
+    @Override
+    public void deleteLedgerLayout() throws IOException {
+        layoutManager.deleteLedgerLayout();
     }
 }
