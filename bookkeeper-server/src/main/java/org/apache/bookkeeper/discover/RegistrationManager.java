@@ -106,9 +106,27 @@ public interface RegistrationManager extends LayoutManager, AutoCloseable {
      */
     void removeCookie(String bookieId, Version version) throws BookieException;
 
-    // TODO:
+    /**
+     * Gets layout manager.
+     *
+     * @return the layout manager
+     */
     LayoutManager getLayoutManager();
 
+    /**
+     * Prepare ledgers root node, availableNode, readonly node..
+     *
+     * @param conf the conf
+     * @return Returns true if old data exists, false if not.
+     */
+    boolean prepareFormat(ServerConfiguration conf) throws Exception;
 
+    /**
+     * Do format boolean.
+     *
+     * @param conf the conf
+     * @return Returns true if success do format, false if not.
+     */
+    boolean doFormat(ServerConfiguration conf) throws Exception;
 
 }

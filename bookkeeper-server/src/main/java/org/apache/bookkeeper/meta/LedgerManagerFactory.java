@@ -197,7 +197,6 @@ public abstract class LedgerManagerFactory {
             Class<? extends LedgerManagerFactory> factoryClass)
             throws IOException, KeeperException, InterruptedException {
 
-        String ledgerRootPath = conf.getZkLedgersRootPath();
         LedgerManagerFactory lmFactory;
         LedgerLayout layout;
         // use default ledger manager factory if no one provided
